@@ -1,0 +1,33 @@
+{
+  "name": "bangdb-manager",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cross-platform (web/PWA/Android/iOS/desktop) manager for BangDB databases and tables",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "proxy": "node proxy/server.mjs",
+    "cap:sync": "npx cap sync",
+    "cap:android": "npx cap add android && npx cap sync android",
+    "cap:ios": "npx cap add ios && npx cap sync ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.1.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.9",
+    "vite-plugin-pwa": "^0.20.5",
+    "vitest": "^2.1.3"
+  }
+}
