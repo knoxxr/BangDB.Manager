@@ -6,6 +6,7 @@ http.createServer(async (req, res) => {
   const chunks = []; for await (const c of req) chunks.push(c);
   const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : null;
   const [, root, db, a, b, c] = req.url.split('?')[0].split('/');
+  if (root === 'stats') return json(res, 200, { uptime_sec: 1234, num_dbs: Object.keys(dbs).length, version: 'mock' });
   if (root !== 'db') return json(res, 404, { msg: 'not found' });
   if (req.method === 'PUT' && db && !a) { dbs[db] = dbs[db] || { tables: {} }; return json(res, 200, { msg: 'created' }); }
   if (req.method === 'DELETE' && db && !a) { delete dbs[db]; return json(res, 200, { msg: 'dropped' }); }

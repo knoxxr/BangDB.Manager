@@ -92,7 +92,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 /** Table rendering of an array of flat-ish objects. Nested values shown as JSON. */
-export function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
+export function DataTable({ rows, onRowClick }: { rows: Record<string, unknown>[]; onRowClick?: (row: Record<string, unknown>, index: number) => void }) {
   const cols = useMemo(() => {
     const s = new Set<string>();
     rows.forEach((r) => Object.keys(r).forEach((k) => s.add(k)));
@@ -105,7 +105,7 @@ export function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
         <thead><tr>{cols.map((c) => <th key={c}>{c}</th>)}</tr></thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i}>{cols.map((c) => <td key={c} title={fmt(r[c])}>{fmt(r[c])}</td>)}</tr>
+            <tr key={i} onClick={onRowClick ? () => onRowClick(r, i) : undefined} style={onRowClick ? { cursor: 'pointer' } : undefined}>{cols.map((c) => <td key={c} title={fmt(r[c])}>{fmt(r[c])}</td>)}</tr>
           ))}
         </tbody>
       </table>

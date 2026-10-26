@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { addIndex, delDoc, dropIndex, extractRows, getDoc, putDoc, rowCount, sql, tableInfo } from '../api/bangdb';
+import { docKey, downloadText, parseDocuments, toCsv } from '../api/data';
 import type { ApiResult, IndexSpec } from '../api/types';
 import { TopBar } from '../components/Layout';
-import { DataTable, Field, JsonOut, ResultBadge, describeResult, useConfirm, useToast } from '../components/ui';
+import { DataTable, Field, JsonOut, Modal, ResultBadge, describeResult, useConfirm, useToast } from '../components/ui';
 import { useConnection } from '../store/store';
 
-type Tab = 'browse' | 'put' | 'key' | 'index' | 'info';
+type Tab = 'browse' | 'put' | 'import' | 'key' | 'index' | 'info';
 
 export default function TableDetailPage() {
   const { connId, db = '', table = '' } = useParams();
@@ -25,12 +26,13 @@ export default function TableDetailPage() {
       <TopBar title={table} crumbs={[{ to: `/c/${conn.id}/dbs`, label: conn.name }, { to: `/c/${conn.id}/db/${encodeURIComponent(db)}`, label: db }, { label: '테이블' }]}
         right={<span className="badge">{count ? (count.ok ? `행 ${n ?? '?'}개` : '카운트 실패') : '…'}</span>} />
       <div className="tabs">
-        {([['browse', '조회'], ['put', '문서 입력'], ['key', '키 조회/삭제'], ['index', '인덱스'], ['info', '정보']] as [Tab, string][]).map(([k, l]) => (
+        {([['browse', '조회'], ['put', '문서 입력'], ['import', '가져오기'], ['key', '키 조회/삭제'], ['index', '인덱스'], ['info', '정보']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
-      {tab === 'browse' && <Browse conn={conn} db={db} table={table} />}
+      {tab === 'browse' && <Browse conn={conn} db={db} table={table} onDone={loadCount} />}
       {tab === 'put' && <PutDoc conn={conn} db={db} table={table} onDone={loadCount} />}
+      {tab === 'import' && <ImportDocs conn={conn} db={db} table={table} onDone={loadCount} />}
       {tab === 'key' && <KeyOps conn={conn} db={db} table={table} onDone={loadCount} />}
       {tab === 'index' && <IndexOps conn={conn} db={db} table={table} />}
       {tab === 'info' && <Info conn={conn} db={db} table={table} />}
@@ -40,12 +42,14 @@ export default function TableDetailPage() {
 
 type P = { conn: NonNullable<ReturnType<typeof useConnection>>; db: string; table: string; onDone?: () => void };
 
-function Browse({ conn, db, table }: P) {
+function Browse({ conn, db, table, onDone }: P) {
   const [limit, setLimit] = useState(50);
   const [where, setWhere] = useState('');
   const [res, setRes] = useState<ApiResult | null>(null);
   const [raw, setRaw] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sel, setSel] = useState<Record<string, unknown> | null>(null);
+  const toast = useToast();
   async function run() {
     setBusy(true);
     const stmt = `select * from ${table}${where.trim() ? ` where ${where.trim()}` : ''} limit ${limit}`;
@@ -53,6 +57,8 @@ function Browse({ conn, db, table }: P) {
     setBusy(false);
   }
   useEffect(() => { run(); /* eslint-disable-next-line */ }, []);
+  const rows = res?.ok ? extractRows(res.data) : [];
+  const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
   return (
     <>
       <div className="row wrap" style={{ marginBottom: 10 }}>
@@ -61,9 +67,120 @@ function Browse({ conn, db, table }: P) {
         <button className="btn primary sm" onClick={run} disabled={busy}>{busy ? '…' : '조회'}</button>
         <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={raw} onChange={(e) => setRaw(e.target.checked)} /> JSON</label>
         <ResultBadge r={res} />
+        {rows.length > 0 && (
+          <>
+            <button className="btn sm ghost" onClick={() => downloadText(`${table}-${stamp()}.json`, JSON.stringify(rows, null, 2))}>JSON 저장</button>
+            <button className="btn sm ghost" onClick={() => downloadText(`${table}-${stamp()}.csv`, '﻿' + toCsv(rows), 'text/csv')}>CSV 저장</button>
+          </>
+        )}
       </div>
       {res && !res.ok && <div className="card danger">{describeResult(res)}</div>}
-      {res?.ok && (raw ? <JsonOut value={res.data} /> : <DataTable rows={extractRows(res.data)} />)}
+      {res?.ok && (raw ? <JsonOut value={res.data} /> : <DataTable rows={rows} onRowClick={(r) => setSel(r)} />)}
+      {res?.ok && !raw && rows.length > 0 && <p className="muted small">행을 누르면 수정/삭제할 수 있습니다.</p>}
+      {sel && (
+        <RowModal doc={sel} onClose={() => setSel(null)}
+          onSave={async (doc) => {
+            const r = await putDoc(conn, db, table, doc);
+            toast(r.ok ? '저장됨' : `실패: ${describeResult(r)}`, r.ok ? 'ok' : 'err');
+            if (r.ok) { setSel(null); run(); onDone?.(); }
+          }}
+          onDelete={async (key) => {
+            const r = await delDoc(conn, db, table, key);
+            toast(r.ok ? '삭제됨' : `실패: ${describeResult(r)}`, r.ok ? 'ok' : 'err');
+            if (r.ok) { setSel(null); run(); onDone?.(); }
+          }} />
+      )}
+    </>
+  );
+}
+
+function RowModal({ doc, onClose, onSave, onDelete }: { doc: Record<string, unknown>; onClose: () => void; onSave: (d: Record<string, unknown>) => Promise<void>; onDelete: (key: string) => Promise<void> }) {
+  const [text, setText] = useState(() => JSON.stringify(doc, null, 2));
+  const [busy, setBusy] = useState(false);
+  const { confirm, confirmEl } = useConfirm();
+  const toast = useToast();
+  const key = docKey(doc);
+  return (
+    <Modal title={key !== undefined ? `문서 ${key}` : '문서'} onClose={onClose}>
+      <Field label="JSON (수정 후 저장하면 같은 _pk 로 덮어씁니다)"><textarea className="mono" value={text} rows={12} spellCheck={false} onChange={(e) => setText(e.target.value)} /></Field>
+      <div className="actions">
+        {key !== undefined && (
+          <button className="btn danger" disabled={busy} onClick={async () => {
+            if (!(await confirm(`키 "${key}" 문서를 삭제할까요?`))) return;
+            setBusy(true); try { await onDelete(key); } finally { setBusy(false); }
+          }}>삭제</button>
+        )}
+        <span className="grow" />
+        <button className="btn" onClick={onClose}>닫기</button>
+        <button className="btn primary" disabled={busy} onClick={async () => {
+          let d: Record<string, unknown>;
+          try { d = parseDocuments(text)[0]; if (!d) throw new Error('비어 있음'); } catch (e) { toast(`JSON 오류: ${(e as Error).message}`, 'err'); return; }
+          setBusy(true); try { await onSave(d); } finally { setBusy(false); }
+        }}>저장</button>
+      </div>
+      {confirmEl}
+    </Modal>
+  );
+}
+
+function ImportDocs({ conn, db, table, onDone }: P) {
+  const [text, setText] = useState('');
+  const [stopOnError, setStopOnError] = useState(true);
+  const [prog, setProg] = useState<{ done: number; total: number; failed: number; running: boolean; errors: string[] } | null>(null);
+  const toast = useToast();
+  const stopRef = useState({ stop: false })[0];
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) setText(await f.text());
+    e.target.value = '';
+  }
+
+  async function run() {
+    let docs: Record<string, unknown>[];
+    try { docs = parseDocuments(text); } catch (e) { toast(`파싱 오류: ${(e as Error).message}`, 'err'); return; }
+    if (!docs.length) { toast('가져올 문서가 없습니다', 'err'); return; }
+    const missing = docs.findIndex((d) => docKey(d) === undefined);
+    if (missing >= 0) { toast(`${missing + 1}번째 문서에 _pk 가 없습니다`, 'err'); return; }
+    stopRef.stop = false;
+    const st = { done: 0, total: docs.length, failed: 0, running: true, errors: [] as string[] };
+    setProg({ ...st });
+    for (const d of docs) {
+      if (stopRef.stop) break;
+      const r = await putDoc(conn, db, table, d);
+      st.done++;
+      if (!r.ok) {
+        st.failed++;
+        if (st.errors.length < 20) st.errors.push(`${docKey(d)}: ${describeResult(r)}`);
+        if (stopOnError) break;
+      }
+      setProg({ ...st });
+    }
+    st.running = false;
+    setProg({ ...st });
+    onDone?.();
+    toast(st.failed ? `완료: ${st.done - st.failed}건 성공, ${st.failed}건 실패` : `${st.done}건 가져옴`, st.failed ? 'err' : 'ok');
+  }
+
+  return (
+    <>
+      <p className="muted small">JSON 배열, 한 줄에 하나씩(JSON Lines), 또는 단일 객체를 붙여넣거나 파일을 선택하세요. 각 문서에 <code>_pk</code> 가 있어야 하며 한 건씩 POST doc 으로 전송됩니다.</p>
+      <div className="row wrap" style={{ marginBottom: 8 }}>
+        <label className="btn sm">파일 선택<input type="file" accept=".json,.jsonl,.ndjson,.txt,application/json" style={{ display: 'none' }} onChange={pick} /></label>
+        <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={stopOnError} onChange={(e) => setStopOnError(e.target.checked)} /> 오류 시 중단</label>
+      </div>
+      <Field label="문서"><textarea className="mono" value={text} rows={10} spellCheck={false} onChange={(e) => setText(e.target.value)} placeholder={'[{"_pk":"u1","name":"a"},{"_pk":"u2","name":"b"}]'} /></Field>
+      <div className="row">
+        <button className="btn primary" disabled={prog?.running || !text.trim()} onClick={run}>가져오기</button>
+        {prog?.running && <button className="btn" onClick={() => { stopRef.stop = true; }}>중지</button>}
+        {prog && <span className="small">{prog.done}/{prog.total} 처리, 실패 {prog.failed}</span>}
+      </div>
+      {prog && prog.total > 0 && (
+        <div style={{ height: 6, background: 'var(--bg3)', borderRadius: 3, margin: '10px 0', overflow: 'hidden' }}>
+          <div style={{ width: `${(prog.done / prog.total) * 100}%`, height: '100%', background: prog.failed ? 'var(--warn)' : 'var(--accent)' }} />
+        </div>
+      )}
+      {prog && prog.errors.length > 0 && <pre className="out">{prog.errors.join('\n')}</pre>}
     </>
   );
 }

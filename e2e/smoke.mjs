@@ -25,6 +25,9 @@ await page.locator('.item .title', { hasText: '테스트 서버' }).click();
 await page.getByRole('button', { name: '새로고침' }).click();
 await page.getByText(/테이블 2개/).waitFor();
 await page.screenshot({ path: `${shots}/02-databases.png` });
+await page.getByRole('button', { name: '서버 상태' }).click();
+await page.getByText(/uptime_sec/).waitFor();
+await page.keyboard.press('Escape');
 await page.locator('.item .title', { hasText: 'mydb' }).click();
 await page.getByText('orders').waitFor();
 await page.getByRole('button', { name: '+ 테이블' }).click();
@@ -40,6 +43,24 @@ await page.getByText('저장됨').waitFor();
 await page.locator('.tabs').getByRole('button', { name: '조회', exact: true }).click();
 await page.getByRole('cell', { name: '김철수' }).waitFor();
 await page.screenshot({ path: `${shots}/04-table-browse.png` });
+// edit a row in place
+await page.getByRole('cell', { name: '김철수' }).click();
+await page.locator('.modal textarea').fill('{"_pk":"u1","name":"김철수","age":32}');
+await page.locator('.modal').getByRole('button', { name: '저장', exact: true }).click();
+await page.getByRole('cell', { name: '32' }).waitFor();
+await page.screenshot({ path: `${shots}/04b-row-edited.png` });
+// bulk import (JSON lines)
+await page.getByRole('button', { name: '가져오기', exact: true }).first().click();
+await page.locator('textarea').fill('{"_pk":"u2","name":"이영희","age":28}\n{"_pk":"u3","name":"박민수","age":45}');
+await page.locator('button.btn.primary', { hasText: '가져오기' }).click();
+await page.getByText('2건 가져옴').waitFor();
+await page.locator('.topbar .badge', { hasText: '행 3개' }).waitFor();
+await page.screenshot({ path: `${shots}/04c-import.png` });
+// export CSV
+await page.locator('.tabs').getByRole('button', { name: '조회', exact: true }).click();
+await page.getByRole('cell', { name: '이영희' }).waitFor();
+const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'CSV 저장' }).click()]);
+console.log('download:', dl.suggestedFilename());
 await page.getByRole('button', { name: '키 조회/삭제' }).click();
 await page.locator('input.mono').first().fill('u1');
 await page.getByRole('button', { name: '조회 (GET)' }).click();

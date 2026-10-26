@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createDb, dropDb, extractTables, listTables } from '../api/bangdb';
+import { call, createDb, dropDb, extractTables, listTables } from '../api/bangdb';
+import type { ApiResult } from '../api/types';
 import { TopBar } from '../components/Layout';
-import { Field, Modal, describeResult, useConfirm, useToast } from '../components/ui';
+import { Field, JsonOut, Modal, ResultBadge, describeResult, useConfirm, useToast } from '../components/ui';
 import { store, useConnection } from '../store/store';
 
 export default function DatabasesPage() {
@@ -15,6 +16,7 @@ export default function DatabasesPage() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [counts, setCounts] = useState<Record<string, number | 'err'>>({});
+  const [stats, setStats] = useState<ApiResult | null | 'loading'>(null);
 
   if (!conn) return <div className="empty">연결을 찾을 수 없습니다. <a href="#/connections">서버 목록</a></div>;
 
@@ -55,7 +57,7 @@ export default function DatabasesPage() {
   return (
     <>
       <TopBar title="데이터베이스" crumbs={[{ to: '/connections', label: '서버' }, { label: conn.name }]}
-        right={<><button className="btn sm" onClick={refresh}>새로고침</button><button className="btn primary sm" onClick={() => setAdding('create')}>+ 생성</button></>} />
+        right={<><button className="btn sm ghost" onClick={async () => { setStats('loading'); setStats(await call(conn, 'serverStats')); }}>서버 상태</button><button className="btn sm" onClick={refresh}>새로고침</button><button className="btn primary sm" onClick={() => setAdding('create')}>+ 생성</button></>} />
       <p className="muted small">BangDB 서버는 보통 bangdb.config 의 DB 하나를 서비스합니다. 목록은 이 앱에 등록된 DB 이름이며, "등록"은 서버에 이미 있는 DB를 목록에만 추가합니다.</p>
       <div className="list">
         {conn.databases.map((db) => (
@@ -80,6 +82,17 @@ export default function DatabasesPage() {
             <button className="btn" onClick={() => setAdding(null)}>취소</button>
             <button className="btn primary" disabled={busy || !name.trim()} onClick={submit}>{adding === 'create' ? '생성' : '등록'}</button>
           </div>
+        </Modal>
+      )}
+      {stats && (
+        <Modal title="서버 상태" onClose={() => setStats(null)}>
+          {stats === 'loading' ? <p className="muted">조회 중…</p> : (
+            <>
+              <div className="row" style={{ marginBottom: 8 }}><ResultBadge r={stats} /><span className="muted small">GET serverStats (추정 경로)</span></div>
+              {!stats.ok && <p className="danger small">{describeResult(stats)}</p>}
+              <JsonOut value={stats.data ?? ''} />
+            </>
+          )}
         </Modal>
       )}
       {confirmEl}
