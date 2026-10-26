@@ -1,0 +1,72 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to release (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  web:
+    name: Web / PWA bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.tag || github.ref }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Package web bundle
+        run: |
+          mkdir -p out/bangdb-manager-web
+          cp -r dist proxy Dockerfile README.md out/bangdb-manager-web/
+          cat > out/bangdb-manager-web/RUN.md <<'TXT'
+          # BangDB Manager (web build)
+          Requires Node.js 20+.
+              BANGDB_URL=http://<bangdb-host>:18080 node proxy/server.mjs
+          Then open http://localhost:8080 (phones on the same network: http://<pc-ip>:8080).
+          TXT
+          (cd out && zip -qr "bangdb-manager-web-${TAG}.zip" bangdb-manager-web)
+      - name: Create/update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: BangDB Manager ${{ env.TAG }}
+          body_path: CHANGELOG.md
+          files: out/bangdb-manager-web-${{ env.TAG }}.zip
+
+  android:
+    name: Android APK (debug)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.tag || github.ref }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - run: npm ci
+      - run: npm run build
+      - name: Generate Android project
+        run: npx cap add android && npx cap sync android
+      - name: Build debug APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "bangdb-manager-${TAG}-android-debug.apk"
+      - name: Attach APK to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: BangDB Manager ${{ env.TAG }}
+          body_path: CHANGELOG.md
+          files: bangdb-manager-${{ env.TAG }}-android-debug.apk

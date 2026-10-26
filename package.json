@@ -15,6 +15,7 @@
     "cap:ios": "npx cap add ios && npx cap sync ios"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.2",
     "@capacitor/core": "^6.1.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

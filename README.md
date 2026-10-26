@@ -96,6 +96,14 @@ npm run cap:ios         # ios/ 생성 후 Xcode 로 열기 (macOS): npx cap open
 "추정" 항목이 사용 중인 BangDB 버전과 다르면 **서버 연결 편집 → 고급: REST 엔드포인트 템플릿 재정의** 에서 연결별로 메서드/경로를 바꿀 수 있고, REST 콘솔로 실제 응답을 확인할 수 있습니다.
 BangDB 서버는 보통 `bangdb.config` 의 `BANGDB_DATABASE_NAME` 하나를 서비스하므로, DB 목록은 앱에 등록된 이름 목록이며 "기존 DB 등록"으로 추가합니다.
 
+## 릴리즈
+
+`v*` 태그를 푸시하면 `.github/workflows/release.yml` 이 웹 빌드 zip 과 Android 디버그 APK 를 만들어 GitHub Release 에 첨부합니다.
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
 ## 테스트
 
 ```bash
