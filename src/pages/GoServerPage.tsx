@@ -104,7 +104,7 @@ export default function GoServerPage({ conn }: { conn: Connection }) {
   );
 }
 
-function ScriptModal({ conn, onClose }: { conn: Connection; onClose: () => void }) {
+export function ScriptModal({ conn, onClose }: { conn: Connection; onClose: () => void }) {
   const toast = useToast();
   const [text, setText] = useState('');
   const [prog, setProg] = useState<(ScriptProgress & { running: boolean }) | null>(null);

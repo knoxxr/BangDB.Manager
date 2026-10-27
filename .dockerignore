@@ -1,0 +1,10 @@
+node_modules
+proxy/node_modules
+dist
+dev-dist
+android
+ios
+.git
+.playwright-mcp
+*.log
+*.db

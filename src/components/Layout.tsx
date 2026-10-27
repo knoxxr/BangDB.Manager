@@ -15,20 +15,22 @@ export default function Layout() {
   const { connections } = useStore();
   const active = connections.find((c) => c.id === connId) ?? connections[0];
   const base = active ? `/c/${active.id}` : undefined;
-  const isGo = active?.kind === 'go';
-  const links = [
+  const kind = active?.kind;
+  const rest = kind === 'rest' || kind === undefined;
+  const dbPath = base ? `${base}/db/${encodeURIComponent(active!.defaultDb)}` : '/connections';
+  const links: { to: string; label: string; icon: JSX.Element; disabled?: boolean; end?: boolean }[] = [
     { to: '/connections', label: '서버', icon: I.server },
-    { to: base ? `${base}/dbs` : '/connections', label: isGo ? '개요' : 'DB', icon: isGo ? I.chart : I.db, disabled: !base },
-    ...(isGo ? [{ to: `${base}/db/${encodeURIComponent(active!.defaultDb)}`, label: '테이블', icon: I.db, disabled: false, end: true }] : []),
-    { to: base ? `${base}/db/${encodeURIComponent(active!.defaultDb)}/query` : '/connections', label: 'SQL', icon: I.sql, disabled: !base },
-    { to: base ? `${base}/console` : '/connections', label: 'REST', icon: I.console, disabled: !base },
+    { to: base ? `${base}/dbs` : '/connections', label: rest ? 'DB' : kind === 'redis' ? '키' : '개요', icon: rest ? I.db : kind === 'redis' ? I.db : I.chart, disabled: !base },
+    ...(kind && kind !== 'rest' && kind !== 'redis' ? [{ to: dbPath, label: kind === 'mongodb' ? '컬렉션' : '테이블', icon: I.db, end: true }] : []),
+    ...(kind !== 'mongodb' && kind !== 'redis' ? [{ to: `${dbPath}/query`, label: 'SQL', icon: I.sql, disabled: !base }] : []),
+    ...(kind === 'go' || rest ? [{ to: base ? `${base}/console` : '/connections', label: 'REST', icon: I.console, disabled: !base }] : []),
     { to: '/about', label: '정보', icon: I.info }
   ];
   const nav = (cls: string) => (
     <nav className={cls}>
       {cls === 'sidenav' && <div className="brand">BangDB Manager</div>}
       {links.map((l) => (
-        <NavLink key={l.label} to={l.to} end={'end' in l} className={({ isActive }) => (isActive && !l.disabled ? 'active' : '')} style={l.disabled ? { opacity: 0.4 } : undefined}>
+        <NavLink key={l.label} to={l.to} end={!!l.end} className={({ isActive }) => (isActive && !l.disabled ? 'active' : '')} style={l.disabled ? { opacity: 0.4 } : undefined}>
           {l.icon}<span>{l.label}</span>
         </NavLink>
       ))}

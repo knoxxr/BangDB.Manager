@@ -5,12 +5,13 @@ import type { GoTableInfo } from '../api/types';
 import { TopBar } from '../components/Layout';
 import { CreateTableModal, CreateViewModal } from '../components/SchemaForms';
 import { DataTable, Modal, useConfirm, useToast } from '../components/ui';
-import { useConnection } from '../store/store';
+import { useDbConnection } from '../store/store';
+import { dialectOf, viewSelect } from '../api/dialect';
 
-/** Tables and views of a knoxxr/bangdb server. */
+/** Tables and views of a SQL database (BangDB or one reached through the gateway). */
 export default function GoTablesPage() {
   const { connId, db = '' } = useParams();
-  const conn = useConnection(connId);
+  const conn = useDbConnection(connId, db);
   const nav = useNavigate();
   const toast = useToast();
   const { confirm, confirmEl } = useConfirm();
@@ -61,7 +62,7 @@ export default function GoTablesPage() {
 
   return (
     <>
-      <TopBar title="테이블" crumbs={[{ to: '/connections', label: '서버' }, { to: `/c/${conn.id}/dbs`, label: conn.name }]}
+      <TopBar title={conn.db && conn.kind !== 'sqlite' ? db : '테이블'} crumbs={[{ to: '/connections', label: '서버' }, { to: `/c/${conn.id}/dbs`, label: conn.name }]}
         right={<>
           <button className="btn sm" onClick={() => nav(`${base}/query`)}>SQL</button>
           <button className="btn sm" onClick={() => setCreating('view')}>+ 뷰</button>
@@ -92,7 +93,7 @@ export default function GoTablesPage() {
               </div>
               <div className="sub">
                 {t.kind === 'view'
-                  ? (t.sql ?? '').replace(/^CREATE VIEW\s+\S+\s+AS\s+/i, '').slice(0, 120)
+                  ? viewSelect(t.sql ?? '').replace(/\s+/g, ' ').slice(0, 120)
                   : `컬럼 ${t.columns?.length ?? 0} · 인덱스 ${(t.indexes ?? []).filter((i) => !i.auto).length} · ${counts[t.name] === undefined ? '…' : `${counts[t.name]!.toLocaleString()}행`} — ${(t.columns ?? []).map((c) => c.name).join(', ')}`}
               </div>
             </div>
@@ -101,9 +102,9 @@ export default function GoTablesPage() {
         ))}
       </div>
       <button className="fab" onClick={() => setCreating('table')} aria-label="테이블 만들기">+</button>
-      {creating === 'table' && <CreateTableModal tables={tables} onClose={() => setCreating(null)} onCreate={create} />}
+      {creating === 'table' && <CreateTableModal tables={tables} d={dialectOf(conn)} onClose={() => setCreating(null)} onCreate={create} />}
       {creating === 'view' && (
-        <CreateViewModal onClose={() => setCreating(null)} onCreate={create}
+        <CreateViewModal d={dialectOf(conn)} onClose={() => setCreating(null)} onCreate={create}
           onPreview={async (s) => { const r = await goQuery(conn, s, undefined, { limit: 5 }); if (r.ok) setPreview(goRows(r.data)); else toast(errorText(r), 'err'); }} />
       )}
       {preview && <Modal title="미리보기 (5행)" onClose={() => setPreview(null)} wide><DataTable rows={preview} /></Modal>}

@@ -1,0 +1,17 @@
+{
+  "name": "bangdb-manager-gateway",
+  "private": true,
+  "version": "0.2.1",
+  "description": "Static server, CORS proxy and database gateway for BangDB Manager",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "mongodb": "^6.21.0",
+    "mssql": "^11.0.2",
+    "mysql2": "^3.24.6",
+    "pg": "^8.23.1",
+    "redis": "^4.7.1"
+  }
+}

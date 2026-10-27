@@ -1,11 +1,14 @@
-// Minimal CORS proxy for running the built app (dist/) against a BangDB server
-// that does not send CORS headers. Usage:
+// Server for the built app (dist/): static files, a CORS proxy for BangDB
+// servers without CORS headers, and the database gateway. Usage:
 //   BANGDB_URL=http://192.168.0.10:18080 PORT=8080 node proxy/server.mjs
-// Serves ./dist as static files and forwards /bangdb/* to BANGDB_URL
-// (or to the URL given in the x-bangdb-target request header).
+// Serves ./dist as static files, forwards /bangdb/* to BANGDB_URL (or to the
+// URL in the x-bangdb-target request header) and answers /gw/* with the
+// gateway for PostgreSQL, MySQL, SQL Server, SQLite, MongoDB and Redis
+// (see gateway/index.mjs; set GATEWAY_TOKEN when the port is reachable by others).
 import http from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
+import { handleGateway } from './gateway/index.mjs';
 
 const PORT = Number(process.env.PORT || 8080);
 const DEFAULT_TARGET = (process.env.BANGDB_URL || 'http://127.0.0.1:18080').replace(/\/+$/, '');
@@ -28,6 +31,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(204, cors);
     return res.end();
   }
+
+  if (await handleGateway(req, res, cors)) return;
 
   if (req.url.startsWith('/bangdb/')) {
     const headerTarget = ALLOW_HEADER_TARGET ? req.headers['x-bangdb-target'] : undefined;
@@ -66,4 +71,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`BangDB Manager serving ${DIST} on http://0.0.0.0:${PORT}`);
   console.log(`Proxying /bangdb/* -> ${DEFAULT_TARGET}`);
+  console.log(`Database gateway on /gw/*${process.env.GATEWAY_TOKEN ? ' (token required)' : ' — no GATEWAY_TOKEN: only this machine\'s own pages are served; set GATEWAY_TOKEN for phones and other PCs'}`);
 });

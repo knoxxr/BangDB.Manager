@@ -18,6 +18,10 @@ function joinUrl(base: string, path: string): string {
 
 /** Base URL actually used for a connection: the real server, or the app-local /bangdb proxy. */
 export function effectiveBase(conn: Connection): string {
+  if (conn.db) {
+    // gateway kinds: an explicit gateway URL, or the server that serves this app
+    return conn.baseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+  }
   if (conn.useProxy) {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     return `${origin}/bangdb`;
@@ -28,6 +32,10 @@ export function effectiveBase(conn: Connection): string {
 export function authHeaders(conn: Connection): Record<string, string> {
   const a = conn.auth;
   const h: Record<string, string> = {};
+  if (conn.db) {
+    if (conn.gatewayToken) h['x-gateway-token'] = conn.gatewayToken;
+    return h;
+  }
   if (conn.useProxy) h['x-bangdb-target'] = conn.baseUrl;
   switch (a.mode) {
     case 'apikey':

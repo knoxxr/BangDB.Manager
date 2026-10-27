@@ -2,17 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { extractRows, sql } from '../api/bangdb';
 import { downloadText, toCsv } from '../api/data';
-import { errorText, goQuery, goTables, qi } from '../api/goapi';
+import { dialectOf, isSqlKind, type Dialect } from '../api/dialect';
+import { errorText, goQuery, goTables } from '../api/goapi';
 import type { ApiResult, Connection, GoQueryResponse, GoTableInfo } from '../api/types';
 import { TopBar } from '../components/Layout';
 import { DataTable, JsonOut, ResultBadge, describeResult } from '../components/ui';
-import { useConnection } from '../store/store';
+import { useDbConnection } from '../store/store';
 
 const HIST_KEY = 'bangdb-manager.sql-history';
 function loadHist(): string[] { try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch { return []; } }
 
 /** Templates for the statements knoxxr/bangdb supports. */
-const SNIPPETS: [string, string][] = [
+const BANGDB_SNIPPETS: [string, string][] = [
   ['SELECT … WHERE … ORDER BY … LIMIT', 'SELECT *\nFROM t\nWHERE x > 0\nORDER BY x DESC\nLIMIT 20 OFFSET 0'],
   ['JOIN + GROUP BY + HAVING', 'SELECT d.name, COUNT(*) AS n, AVG(e.salary) AS avg_salary\nFROM emp e\nJOIN dept d ON d.id = e.dept_id\nGROUP BY d.name\nHAVING COUNT(*) > 1\nORDER BY n DESC'],
   ['INSERT … RETURNING', "INSERT INTO t (name, age)\nVALUES ('kim', 31)\nRETURNING *"],
@@ -35,12 +36,62 @@ const SNIPPETS: [string, string][] = [
   ['ANALYZE / VACUUM', 'ANALYZE;\n-- VACUUM;']
 ];
 
+const TX: Record<string, string> = { mssql: 'BEGIN TRANSACTION', mysql: 'START TRANSACTION' };
+
+/** Database-specific templates for the gateway's SQL databases. */
+const OWN_SNIPPETS: Record<string, [string, string][]> = {
+  postgres: [
+    ['UPSERT (ON CONFLICT)', "INSERT INTO t (id, name) VALUES (1, 'kim')\nON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name\nRETURNING *"],
+    ['JSONB 조회', "SELECT id, meta->>'lvl' AS lvl FROM emp WHERE meta @> '{\"lvl\": 3}'"],
+    ['테이블 크기', "SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) AS size\nFROM pg_class WHERE relkind = 'r'\nORDER BY pg_total_relation_size(oid) DESC LIMIT 20"],
+    ['실행 중인 쿼리', "SELECT pid, state, now() - query_start AS running, query\nFROM pg_stat_activity WHERE state <> 'idle'"],
+    ['스키마 · 확장', 'CREATE SCHEMA IF NOT EXISTS app;\nSELECT * FROM pg_extension;']
+  ],
+  mysql: [
+    ['UPSERT (ON DUPLICATE KEY)', "INSERT INTO t (id, name) VALUES (1, 'kim')\nON DUPLICATE KEY UPDATE name = VALUES(name)"],
+    ['JSON 조회', "SELECT id, meta->>'$.lvl' AS lvl FROM emp WHERE JSON_EXTRACT(meta, '$.lvl') = 3"],
+    ['테이블 크기', 'SELECT TABLE_NAME, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 2) AS mb\nFROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()\nORDER BY mb DESC'],
+    ['실행 중인 쿼리', 'SHOW FULL PROCESSLIST'],
+    ['변수 · 권한', "SHOW VARIABLES LIKE 'max_connections';\nSHOW GRANTS;"]
+  ],
+  mssql: [
+    ['MERGE (UPSERT)', "MERGE t AS tgt\nUSING (SELECT 1 AS id, N'kim' AS name) AS src ON tgt.id = src.id\nWHEN MATCHED THEN UPDATE SET name = src.name\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (src.id, src.name);"],
+    ['OUTPUT 으로 결과 받기', "INSERT INTO t (name) OUTPUT INSERTED.* VALUES (N'kim')"],
+    ['DB 크기', 'EXEC sp_spaceused'],
+    ['실행 중인 요청', 'SELECT session_id, status, command, wait_type, total_elapsed_time FROM sys.dm_exec_requests'],
+    ['JSON 조회', "SELECT id, JSON_VALUE(meta, '$.lvl') AS lvl FROM emp"]
+  ],
+  sqlite: [
+    ['UPSERT (ON CONFLICT)', "INSERT INTO t (id, name) VALUES (1, 'kim')\nON CONFLICT (id) DO UPDATE SET name = excluded.name\nRETURNING *"],
+    ['JSON 조회', "SELECT id, meta ->> '$.lvl' AS lvl FROM emp WHERE json_valid(meta)"],
+    ['스키마 보기', 'SELECT type, name, sql FROM sqlite_master'],
+    ['무결성 검사', 'PRAGMA integrity_check'],
+    ['설정', 'PRAGMA journal_mode;']
+  ]
+};
+
+/** Example statements for the connection's database. */
+function snippetsFor(d: Dialect): [string, string][] {
+  if (d.id === 'bangdb') return BANGDB_SNIPPETS;
+  const t = d.qt('t');
+  return [
+    ['SELECT … WHERE … ORDER BY', d.page(`SELECT *\nFROM ${t}\nWHERE ${d.q('x')} > 0`, `${d.q('x')} DESC`, 20, 0)],
+    ['JOIN + GROUP BY + HAVING', 'SELECT d.name, COUNT(*) AS n, AVG(e.salary) AS avg_salary\nFROM emp e\nJOIN dept d ON d.id = e.dept_id\nGROUP BY d.name\nHAVING COUNT(*) > 1'],
+    ['윈도우 함수', 'SELECT name, salary,\n  RANK() OVER (PARTITION BY dept_id ORDER BY salary DESC) AS rnk\nFROM emp'],
+    ['CTE (WITH)', 'WITH top AS (\n  SELECT dept_id, MAX(salary) AS m FROM emp GROUP BY dept_id\n)\nSELECT * FROM top'],
+    ['트랜잭션 (한 요청 안에서)', `${TX[d.id] ?? 'BEGIN'};\nUPDATE account SET balance = balance - 100 WHERE id = 1;\nUPDATE account SET balance = balance + 100 WHERE id = 2;\nCOMMIT;`],
+    ...(OWN_SNIPPETS[d.id] ?? [])
+  ];
+}
+
 export default function QueryPage() {
   const { connId, db = '' } = useParams();
-  const conn = useConnection(connId);
+  const conn = useDbConnection(connId, db);
   const loc = useLocation();
-  const isGo = conn?.kind === 'go';
-  const [stmt, setStmt] = useState<string>((loc.state as { sql?: string } | null)?.sql ?? (isGo ? 'SELECT * FROM  LIMIT 20' : 'select * from  limit 20'));
+  const isGo = isSqlKind(conn?.kind);
+  const d = dialectOf(conn);
+  const snippets = snippetsFor(d);
+  const [stmt, setStmt] = useState<string>((loc.state as { sql?: string } | null)?.sql ?? (isGo ? (d.id === 'mssql' ? 'SELECT TOP 20 * FROM ' : 'SELECT * FROM  LIMIT 20') : 'select * from  limit 20'));
   const [res, setRes] = useState<ApiResult | null>(null);
   const [raw, setRaw] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -92,12 +143,12 @@ export default function QueryPage() {
       </div>
       <div className="toolbar">
         <button className="btn primary" onClick={() => run()} disabled={busy}>{busy ? '실행 중…' : '실행 (Ctrl+Enter)'}</button>
-        {isGo && <button className="btn sm" onClick={() => run('EXPLAIN ')} disabled={busy} title="실행 계획">EXPLAIN</button>}
-        {isGo && <button className="btn sm" onClick={() => run('EXPLAIN ANALYZE ')} disabled={busy} title="실제로 실행하고 단계별 행 수·시간 표시 (SELECT)">EXPLAIN ANALYZE</button>}
+        {isGo && d.explain && <button className="btn sm" onClick={() => run(d.explain!.plan)} disabled={busy} title="실행 계획">{d.explain.plan.trim()}</button>}
+        {isGo && d.explain?.analyze && <button className="btn sm" onClick={() => run(d.explain!.analyze!)} disabled={busy} title="실제로 실행하고 단계별 행 수·시간 표시">{d.explain.analyze.trim()}</button>}
         {isGo && (
-          <select className="inp" value="" onChange={(e) => { if (e.target.value) setStmt(SNIPPETS[Number(e.target.value)][1]); }} style={{ maxWidth: 220 }}>
+          <select className="inp" value="" onChange={(e) => { if (e.target.value) setStmt(snippets[Number(e.target.value)][1]); }} style={{ maxWidth: 220 }}>
             <option value="">예제 SQL…</option>
-            {SNIPPETS.map(([l], i) => <option key={i} value={i}>{l}</option>)}
+            {snippets.map(([l], i) => <option key={i} value={i}>{l}</option>)}
           </select>
         )}
         {hist.length > 0 && (
@@ -117,7 +168,7 @@ export default function QueryPage() {
           {argErr && <p className="danger small">{argErr}</p>}
         </details>
       )}
-      <p className="muted small" style={{ margin: '4px 0 10px' }}>선택한 부분만 실행할 수 있습니다. 여러 문장은 ;로 구분하며 한 요청 안에서 BEGIN … COMMIT 트랜잭션이 됩니다.</p>
+      <p className="muted small" style={{ margin: '4px 0 10px' }}>선택한 부분만 실행할 수 있습니다. 여러 문장은 ;로 구분하며 마지막 결과가 표시됩니다{d.id === 'bangdb' ? '. 한 요청 안에서 BEGIN … COMMIT 트랜잭션이 됩니다' : ` (${d.label} 에서 하나의 세션으로 실행)`}.</p>
 
       {res && !res.ok && <div className="card danger">{isGo ? errorText(res) : describeResult(res)}</div>}
       {res?.ok && (
@@ -137,14 +188,14 @@ export default function QueryPage() {
 
   return (
     <>
-      <TopBar title="SQL 콘솔" crumbs={[{ to: `/c/${conn.id}/dbs`, label: conn.name }, { to: `/c/${conn.id}/db/${encodeURIComponent(db)}`, label: isGo ? '테이블' : db }]} />
-      {isGo ? <div className="split"><SchemaPanel conn={conn} onInsert={insert} onSelect={(t) => setStmt(`SELECT * FROM ${qi(t)} LIMIT 100`)} />{editor}</div> : editor}
+      <TopBar title="SQL 콘솔" crumbs={[{ to: `/c/${conn.id}/dbs`, label: conn.name }, { to: `/c/${conn.id}/db/${encodeURIComponent(db)}`, label: conn.kind === 'go' || conn.kind === 'sqlite' ? '테이블' : db }]} />
+      {isGo ? <div className="split"><SchemaPanel conn={conn} d={d} onInsert={insert} onSelect={(t) => setStmt(d.page(`SELECT * FROM ${d.qt(t)}`, '', 100, 0))} />{editor}</div> : editor}
       {!isGo && <p className="muted small" style={{ marginTop: 12 }}>POST /db/{db}/query 에 {'{"sql": "..."}'} 로 전송됩니다. BangDB 의 SQL-like 문법(select/where/limit 등)을 따릅니다.</p>}
     </>
   );
 }
 
-function SchemaPanel({ conn, onInsert, onSelect }: { conn: Connection; onInsert: (t: string) => void; onSelect: (table: string) => void }) {
+function SchemaPanel({ conn, d, onInsert, onSelect }: { conn: Connection; d: Dialect; onInsert: (t: string) => void; onSelect: (table: string) => void }) {
   const [tables, setTables] = useState<GoTableInfo[]>([]);
   useEffect(() => { goTables(conn).then((r) => r.ok && setTables(r.data.tables)); }, [conn]);
   return (
@@ -153,12 +204,12 @@ function SchemaPanel({ conn, onInsert, onSelect }: { conn: Connection; onInsert:
       {tables.map((t) => (
         <details key={t.name}>
           <summary>
-            <span onClick={(e) => { e.preventDefault(); onInsert(qi(t.name)); }} title="이름 넣기">{t.name}</span>
+            <span onClick={(e) => { e.preventDefault(); onInsert(d.qt(t.name)); }} title="이름 넣기">{t.name}</span>
             {t.kind === 'view' && <span className="badge" style={{ marginLeft: 6 }}>뷰</span>}
             <a href="#" className="small" style={{ float: 'right' }} onClick={(e) => { e.preventDefault(); onSelect(t.name); }} title="SELECT 문 만들기">▶</a>
           </summary>
           {(t.columns ?? []).map((c) => (
-            <div key={c.name} className="colname" onClick={() => onInsert(qi(c.name))}><span>{c.pk ? '🔑 ' : ''}{c.name}</span><span>{c.decl || c.type}</span></div>
+            <div key={c.name} className="colname" onClick={() => onInsert(d.q(c.name))}><span>{c.pk ? '🔑 ' : ''}{c.name}</span><span>{c.decl || c.type}</span></div>
           ))}
         </details>
       ))}

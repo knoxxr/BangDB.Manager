@@ -1,39 +1,47 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ROWID, affinity, analyze, applyChanges, bulkInsert, countWhere, dropColumn, dropIndex, dropTable, dropView, dumpSql, errorText,
-  goQuery, goRows, goTable, literal, pageSql, qi, readAll, renameTable, type BulkProgress, type InsertMode, type RowChange
+  ROWID, affinity, analyze, applyChanges, bulkInsert, countWhere, dropColumn, dropIndex, dropTable, dropView, dumpSql, errorText, execStatements,
+  goQuery, goRows, goTable, insertModes, pageSql, readAll, renameTable, type BulkProgress, type InsertMode, type RowChange, type RowRef
 } from '../api/goapi';
 import { csvToDocs, downloadText, parseDocuments, toCsv } from '../api/data';
+import { dialectOf, identityOf, viewSelect, type Dialect, type Identity } from '../api/dialect';
 import type { ColumnInfo, Connection, GoQueryResponse, GoTableInfo } from '../api/types';
 import { DataGrid, type GridRow } from '../components/DataGrid';
 import { TopBar } from '../components/Layout';
 import { RowForm } from '../components/RowForm';
-import { AddColumnModal, CreateIndexForm, CreateViewModal } from '../components/SchemaForms';
+import { AddColumnModal, AlterColumnModal, CreateIndexForm, CreateViewModal } from '../components/SchemaForms';
 import { DataTable, Modal, useConfirm, usePrompt, useToast } from '../components/ui';
-import { useConnection } from '../store/store';
+import { useDbConnection } from '../store/store';
 
 type Tab = 'data' | 'structure' | 'index' | 'transfer' | 'ddl';
 
-/** Table / view page for knoxxr/bangdb (Go) connections. */
+/** Table / view page for SQL connections: BangDB (Go) and the gateway's PostgreSQL, MySQL, SQL Server, SQLite. */
 export default function GoTablePage() {
   const { connId, db = '', table = '' } = useParams();
-  const conn = useConnection(connId);
+  const conn = useDbConnection(connId, db);
   const nav = useNavigate();
   const [tab, setTab] = useState<Tab>('data');
-  const [info, setInfo] = useState<GoTableInfo | null | undefined>(undefined);
-  const [total, setTotal] = useState<number | undefined>();
-  const [infoErr, setInfoErr] = useState('');
+  // metadata is kept with the table it describes: after navigating to another
+  // table nothing may run with the previous table's key columns
+  const [loaded, setLoaded] = useState<{ at: string; info: GoTableInfo | null; err: string } | null>(null);
+  const [counted, setCounted] = useState<{ at: string; n: number | undefined } | null>(null);
+  const at = `${db}/${table}`;
+  const info = loaded?.at === at ? loaded.info : undefined;
+  const infoErr = loaded?.at === at ? loaded.err : '';
+  const total = counted?.at === at ? counted.n : undefined;
 
+  useEffect(() => { setTab('data'); }, [at]);
   const loadInfo = useCallback(async () => {
     if (!conn) return;
     const r = await goTable(conn, table);
-    if (r.ok) { setInfo(r.data); setInfoErr(''); } else { setInfo(null); setInfoErr(errorText(r)); }
-  }, [conn, table]);
-  const loadCount = useCallback(async () => { if (conn) setTotal(await countWhere(conn, table)); }, [conn, table]);
+    setLoaded({ at, info: r.ok ? r.data : null, err: r.ok ? '' : errorText(r) });
+  }, [conn, table, at]);
+  const loadCount = useCallback(async () => { if (conn) { const n = await countWhere(conn, table); setCounted({ at, n }); } }, [conn, table, at]);
   useEffect(() => { loadInfo(); loadCount(); }, [loadInfo, loadCount]);
 
   if (!conn) return <div className="empty">연결을 찾을 수 없습니다.</div>;
+  const d = dialectOf(conn);
   const base = `/c/${conn.id}/db/${encodeURIComponent(db)}`;
   const isView = info?.kind === 'view';
   const tabs: [Tab, string][] = isView
@@ -42,16 +50,16 @@ export default function GoTablePage() {
 
   return (
     <>
-      <TopBar title={table} crumbs={[{ to: `/c/${conn.id}/dbs`, label: conn.name }, { to: base, label: '테이블' }]}
+      <TopBar title={table} crumbs={[{ to: `/c/${conn.id}/dbs`, label: conn.name }, { to: base, label: conn.db && conn.kind !== 'sqlite' ? db : '테이블' }]}
         right={<>
           {isView && <span className="badge accent">뷰</span>}
           {info?.store && <span className="badge accent">{info.store === 'memory' ? '인메모리' : info.store === 'timeseries' ? '시계열' : info.store}</span>}
           <span className="badge">{total === undefined ? '…' : `${total.toLocaleString()}행`}</span>
-          <button className="btn sm" onClick={() => nav(`${base}/query`, { state: { sql: `SELECT * FROM ${qi(table)} LIMIT 100` } })}>SQL</button>
+          <button className="btn sm" onClick={() => nav(`${base}/query`, { state: { sql: d.page(`SELECT * FROM ${d.qt(table)}`, '', 100, 0) } })}>SQL</button>
         </>} />
       {info === null && <div className="card danger">{infoErr || '테이블 정보를 가져오지 못했습니다.'}</div>}
       {info && (
-        <>
+        <div key={`${db}/${table}`}>
           <div className="tabs">
             {tabs.map(([k, l]) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{l}</button>)}
           </div>
@@ -60,7 +68,7 @@ export default function GoTablePage() {
           {tab === 'index' && <IndexTab conn={conn} table={table} info={info} onChanged={loadInfo} />}
           {tab === 'transfer' && <TransferTab conn={conn} table={table} info={info} onChanged={loadCount} />}
           {tab === 'ddl' && <DdlTab conn={conn} table={table} info={info} base={base} onChanged={loadInfo} />}
-        </>
+        </div>
       )}
     </>
   );
@@ -77,6 +85,8 @@ function DataTab({ conn, table, info, onChanged }: TabProps) {
   const toast = useToast();
   const { confirm, confirmEl } = useConfirm();
   const isView = info.kind === 'view';
+  const d = dialectOf(conn);
+  const ident: Identity = useMemo(() => identityOf(d, info), [d, info]);
   const [pg, setPg] = useState<PageState>({ where: '', search: '', desc: false, limit: 50, offset: 0 });
   const [whereIn, setWhereIn] = useState('');
   const [searchIn, setSearchIn] = useState('');
@@ -101,33 +111,43 @@ function DataTab({ conn, table, info, onChanged }: TabProps) {
     if (pg.where.trim()) parts.push(`(${pg.where.trim()})`);
     if (pg.search.trim()) {
       const text = columns.filter((c) => ['TEXT', 'ANY'].includes(affinity(c)));
-      const like = literal(`%${pg.search.trim()}%`);
+      const like = d.literal(`%${pg.search.trim()}%`);
       const targets = text.length ? text : columns;
-      if (targets.length) parts.push(`(${targets.map((c) => `${qi(c.name)} LIKE ${like}`).join(' OR ')})`);
+      if (targets.length) parts.push(`(${targets.map((c) => `${d.q(c.name)} ${d.likeCI} ${like}`).join(' OR ')})`);
     }
     return parts.join(' AND ');
-  }, [pg.where, pg.search, columns]);
+  }, [pg.where, pg.search, columns, d]);
 
   const load = useCallback(async () => {
     setBusy(true);
-    const sql = pageSql(table, { where: cond, orderBy: pg.orderBy, desc: pg.desc, limit: pg.limit, offset: pg.offset }, !isView);
-    const [r, n] = await Promise.all([goQuery(conn, sql), countWhere(conn, table, cond)]);
+    const sql = pageSql(table, { where: cond, orderBy: pg.orderBy, desc: pg.desc, limit: pg.limit, offset: pg.offset }, isView ? false : ident ?? false, d);
+    const [r, n] = await Promise.all([goQuery(conn, sql, undefined, { limit: pg.limit }), countWhere(conn, table, cond)]);
     setBusy(false);
     if (r.ok) { setData(r.data); setErr(''); } else { setData(null); setErr(errorText(r)); }
     setMatched(n);
-  }, [conn, table, cond, pg.orderBy, pg.desc, pg.limit, pg.offset, isView]);
+  }, [conn, table, cond, pg.orderBy, pg.desc, pg.limit, pg.offset, isView, ident, d]);
   useEffect(() => { load(); }, [load]);
 
   const rawRows = useMemo(() => (data ? goRows(data) : []), [data]);
-  const unsafeIds = !isView && rawRows.some((r) => !Number.isSafeInteger(r[ROWID]));
-  const readOnly = isView || unsafeIds;
+  const unsafeIds = ident?.kind === 'rowid' && rawRows.some((r) => !Number.isSafeInteger(r[ROWID]));
+  const readOnly = isView || !ident || unsafeIds;
   const rows: GridRow[] = useMemo(() => {
     const existing = rawRows.map((r, i) => {
       const { [ROWID]: id, ...values } = r;
-      return { key: isView ? `v${i}` : String(id), values };
+      const key = !ident ? `v${i}` : ident.kind === 'pk' ? JSON.stringify(ident.columns.map((c) => values[c])) : String(id);
+      return { key, values };
     });
     return [...inserts.map((k) => ({ key: k, values: {}, isNew: true })), ...existing];
-  }, [rawRows, inserts, isView]);
+  }, [rawRows, inserts, ident]);
+
+  /** Where an existing grid row is, from its key and original values. */
+  const refOf = (key: string): RowRef => {
+    if (ident?.kind === 'pk') {
+      const row = rows.find((r) => r.key === key)?.values ?? {};
+      return { pk: Object.fromEntries(ident.columns.map((c) => [c, row[c]])) };
+    }
+    return { rowid: ident?.kind === 'rowid' ? Number(key) : key };
+  };
 
   const nEdits = Object.keys(edits).filter((k) => !k.startsWith('new:') && !deleted.has(k)).length;
   const pending = nEdits + inserts.length + deleted.size;
@@ -173,7 +193,7 @@ function DataTab({ conn, table, info, onChanged }: TabProps) {
 
   async function commit(changes: RowChange[], msg: string): Promise<boolean> {
     try {
-      const r = await applyChanges(conn, table, changes);
+      const r = await applyChanges(conn, table, changes, ident);
       if (!r.ok) { toast(`저장 실패 — 아무것도 반영되지 않았습니다: ${errorText(r)}`, 'err'); return false; }
       toast(msg, 'ok');
       return true;
@@ -182,8 +202,8 @@ function DataTab({ conn, table, info, onChanged }: TabProps) {
 
   async function saveAll() {
     const changes: RowChange[] = [
-      ...[...deleted].map((k) => ({ kind: 'delete' as const, rowid: Number(k) })),
-      ...Object.entries(edits).filter(([k]) => !k.startsWith('new:') && !deleted.has(k)).map(([k, v]) => ({ kind: 'update' as const, rowid: Number(k), values: v })),
+      ...[...deleted].map((k): RowChange => ({ kind: 'delete', ...refOf(k) })),
+      ...Object.entries(edits).filter(([k]) => !k.startsWith('new:') && !deleted.has(k)).map(([k, v]): RowChange => ({ kind: 'update', ...refOf(k), values: v })),
       ...[...inserts].reverse().map((k) => ({ kind: 'insert' as const, values: edits[k] ?? {} }))
     ];
     setSaving(true);
@@ -237,6 +257,7 @@ function DataTab({ conn, table, info, onChanged }: TabProps) {
       </div>
       {err && <div className="card danger">{err}</div>}
       {unsafeIds && <p className="warn small">rowid 가 JavaScript 정수 범위를 넘어 이 화면에서는 편집할 수 없습니다. SQL 콘솔을 사용하세요.</p>}
+      {!isView && !ident && <p className="warn small">기본 키가 없는 테이블이라 행을 특정할 수 없어 읽기 전용입니다. 구조 탭에서 기본 키(또는 UNIQUE NOT NULL 컬럼)를 추가하거나 SQL 콘솔을 사용하세요.</p>}
       {!err && (
         <DataGrid columns={columns} rows={rows} readOnly={readOnly} edits={edits} deleted={deleted} selected={selected}
           sort={pg.orderBy ? { col: pg.orderBy, desc: pg.desc } : undefined} onSort={sortBy}
@@ -256,7 +277,7 @@ function DataTab({ conn, table, info, onChanged }: TabProps) {
       )}
       {form && (
         <RowForm columns={columns} values={form.values} isNew={form.isNew} readOnly={readOnly}
-          title={form.isNew ? '새 행' : readOnly ? '행 보기' : `행 편집 (rowid ${form.key})`}
+          title={form.isNew ? '새 행' : readOnly ? '행 보기' : ident?.kind === 'pk' ? `행 편집 (${ident.columns.join(', ')} = ${JSON.parse(form.key!).join(', ')})` : `행 편집 (${ident?.kind === 'ctid' ? 'ctid' : 'rowid'} ${form.key})`}
           onClose={() => setForm(null)}
           onSubmit={readOnly ? undefined : async (values) => {
             if (form.isNew) {
@@ -267,12 +288,12 @@ function DataTab({ conn, table, info, onChanged }: TabProps) {
               }
               return ok;
             }
-            const ok = await commit([{ kind: 'update', rowid: Number(form.key), values }], '저장됨');
+            const ok = await commit([{ kind: 'update', ...refOf(form.key!), values }], '저장됨');
             if (ok) { setEdits((e) => { const n = { ...e }; delete n[form.key!]; return n; }); load(); }
             return ok;
           }}
           onDelete={readOnly || form.isNew ? undefined : async () => {
-            const ok = await commit([{ kind: 'delete', rowid: Number(form.key) }], '행 삭제됨');
+            const ok = await commit([{ kind: 'delete', ...refOf(form.key!) }], '행 삭제됨');
             if (ok) { load(); onChanged(); }
             return ok;
           }}
@@ -291,12 +312,13 @@ function StructureTab({ conn, table, info, base, onChanged }: TabProps & { base:
   const { confirm, confirmEl } = useConfirm();
   const { prompt, promptEl } = usePrompt();
   const [adding, setAdding] = useState(false);
+  const [altering, setAltering] = useState<ColumnInfo | null>(null);
+  const d = dialectOf(conn);
   const constraints = useMemo(() => tableConstraints(info.sql ?? ''), [info.sql]);
-  const storage = /\)\s*(USING\s+[\s\S]+?);?\s*(?:\n|$)/i.exec((info.sql ?? '').split(/;\s*\n/)[0])?.[1];
+  const storage = d.storage ? /\)\s*(USING\s+[\s\S]+?);?\s*(?:\n|$)/i.exec((info.sql ?? '').split(/;\s*\n/)[0])?.[1] : undefined;
 
   async function run(sql: string | string[], ok: string): Promise<boolean> {
-    const list = Array.isArray(sql) ? sql : [sql];
-    const r = await goQuery(conn, list.length > 1 ? `BEGIN;\n${list.join(';\n')};\nCOMMIT;` : list[0], undefined, { mode: 'exec' });
+    const r = await execStatements(conn, Array.isArray(sql) ? sql : [sql]);
     if (!r.ok) { toast(`실패: ${errorText(r)}`, 'err'); return false; }
     toast(ok, 'ok'); onChanged(); return true;
   }
@@ -321,7 +343,7 @@ function StructureTab({ conn, table, info, base, onChanged }: TabProps & { base:
                   <td>
                     <div className="chips">
                       {c.pk && <span className="badge warn">PRIMARY KEY</span>}
-                      {c.autoinc && <span className="badge">AUTOINCREMENT</span>}
+                      {c.autoinc && <span className="badge">{d.id === 'mysql' ? 'AUTO_INCREMENT' : d.id === 'mssql' || d.id === 'postgres' ? 'IDENTITY' : 'AUTOINCREMENT'}</span>}
                       {c.notNull && <span className="badge">NOT NULL</span>}
                       {c.unique && <span className="badge">UNIQUE</span>}
                       {c.collate && <span className="badge">COLLATE {c.collate}</span>}
@@ -329,9 +351,10 @@ function StructureTab({ conn, table, info, base, onChanged }: TabProps & { base:
                     </div>
                   </td>
                   <td className="acts">
+                    {d.alterColumn && <button className="btn sm ghost" onClick={() => setAltering(c)}>수정</button>}
                     <button className="btn sm ghost" onClick={async () => {
                       const to = await prompt('컬럼 이름 변경', `${c.name} →`, c.name);
-                      if (to && to !== c.name) run(`ALTER TABLE ${qi(table)} RENAME COLUMN ${qi(c.name)} TO ${qi(to)}`, `컬럼 이름 변경: ${c.name} → ${to}`);
+                      if (to && to !== c.name) run(d.renameColumn(table, c.name, to), `컬럼 이름 변경: ${c.name} → ${to}`);
                     }}>이름 변경</button>
                     <button className="btn sm danger" onClick={async () => {
                       if (!(await confirm(`컬럼 "${c.name}" 와 그 값을 모두 삭제합니다.`))) return;
@@ -353,7 +376,9 @@ function StructureTab({ conn, table, info, base, onChanged }: TabProps & { base:
             {storage && <div className="mono small">{storage}</div>}
             {constraints.map((c, i) => <div key={i} className="mono small">{c}</div>)}
           </div>
-          <p className="muted small" style={{ marginBottom: 0 }}>제약을 바꾸려면 DDL 탭의 정의로 새 테이블을 만들어 데이터를 옮기세요 (INSERT INTO 새 SELECT * FROM 기존).</p>
+          <p className="muted small" style={{ marginBottom: 0 }}>{d.id === 'bangdb' || d.id === 'sqlite'
+            ? '제약을 바꾸려면 DDL 탭의 정의로 새 테이블을 만들어 데이터를 옮기세요 (INSERT INTO 새 SELECT * FROM 기존).'
+            : '제약 추가·삭제는 SQL 콘솔에서 ALTER TABLE … ADD / DROP CONSTRAINT 로 할 수 있습니다.'}</p>
         </div>
       )}
 
@@ -368,15 +393,15 @@ function StructureTab({ conn, table, info, base, onChanged }: TabProps & { base:
           }}>이름 변경</button>
           <button className="btn sm" onClick={async () => { const r = await analyze(conn, table); toast(r.ok ? 'ANALYZE 완료 — 인덱스 통계가 갱신됐습니다' : `실패: ${errorText(r)}`, r.ok ? 'ok' : 'err'); if (r.ok) onChanged(); }}>ANALYZE (통계 갱신)</button>
           <button className="btn sm" onClick={async () => {
-            const to = await prompt('테이블 복제', '새 테이블 이름 (구조는 정의 SQL, 데이터는 INSERT … SELECT 로 복사)', `${table}_copy`);
+            const to = await prompt('테이블 복제', d.copyTable ? '새 테이블 이름 (구조와 데이터를 복사)' : '새 테이블 이름 (구조는 정의 SQL, 데이터는 INSERT … SELECT 로 복사)', `${table}_copy`);
             if (!to) return;
-            const ddl = copyDdl(info.sql ?? '', table, to);
-            if (await run([...ddl, `INSERT INTO ${qi(to)} SELECT * FROM ${qi(table)}`], `"${to}" 로 복제됨`)) nav(`${base}/t/${encodeURIComponent(to)}`);
+            const stmts = d.copyTable ? d.copyTable(table, to) : [...copyDdl(info.sql ?? '', table, to, d), `INSERT INTO ${d.qt(to)} SELECT * FROM ${d.qt(table)}`];
+            if (await run(stmts, `"${to}" 로 복제됨${d.id === 'mssql' ? ' (SQL Server 의 SELECT INTO 는 제약·인덱스를 복사하지 않습니다)' : ''}`)) nav(`${base}/t/${encodeURIComponent(to)}`);
           }}>복제</button>
           <span className="grow" />
           <button className="btn sm danger" onClick={async () => {
             if (!(await confirm(`"${table}" 의 모든 행을 삭제합니다 (DELETE FROM). 구조는 남습니다.`, '모두 삭제'))) return;
-            run(`DELETE FROM ${qi(table)}`, '모든 행 삭제됨');
+            run(`DELETE FROM ${d.qt(table)}`, '모든 행 삭제됨');
           }}>모든 행 삭제</button>
           <button className="btn sm danger" onClick={async () => {
             if (!(await confirm(`테이블 "${table}" 를 삭제(DROP)합니다. 데이터와 인덱스가 모두 사라집니다.`))) return;
@@ -385,7 +410,8 @@ function StructureTab({ conn, table, info, base, onChanged }: TabProps & { base:
           }}>DROP TABLE</button>
         </div>
       </div>
-      {adding && <AddColumnModal table={table} onClose={() => setAdding(false)} onAdd={(sqls) => run(sqls, '컬럼 추가됨')} />}
+      {adding && <AddColumnModal table={table} d={d} onClose={() => setAdding(false)} onAdd={(sqls) => run(sqls, '컬럼 추가됨')} />}
+      {altering && <AlterColumnModal table={table} col={altering} d={d} onClose={() => setAltering(null)} onRun={(sqls) => run(sqls, `컬럼 "${altering.name}" 수정됨`)} />}
       {confirmEl}{promptEl}
     </>
   );
@@ -397,12 +423,12 @@ function tableConstraints(sql: string): string[] {
   return create.split('\n').map((l) => l.trim().replace(/,$/, '')).filter((l) => /^(PRIMARY KEY|UNIQUE|CHECK|FOREIGN KEY|CONSTRAINT)\b/i.test(l));
 }
 
-/** The table's CREATE TABLE / CREATE INDEX statements renamed for a copy. */
-function copyDdl(sql: string, from: string, to: string): string[] {
+/** The table's CREATE TABLE / CREATE INDEX statements renamed for a copy (BangDB, SQLite). */
+function copyDdl(sql: string, from: string, to: string, d: Dialect): string[] {
   const esc = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return sql.split(/;\s*(?:\n|$)/).map((s) => s.trim()).filter(Boolean).map((s, i) => {
-    if (i === 0) return s.replace(new RegExp(`^CREATE TABLE\\s+("?${esc}"?)`, 'i'), `CREATE TABLE ${qi(to)}`);
-    return s.replace(new RegExp(`^CREATE (UNIQUE )?INDEX\\s+("?)([^"\\s]+)\\2\\s+ON\\s+("?${esc}"?)`, 'i'), (_m, u, _q, name) => `CREATE ${u ?? ''}INDEX ${qi(`${name}_${to}`)} ON ${qi(to)}`);
+    if (i === 0) return s.replace(new RegExp(`^CREATE TABLE\\s+("?${esc}"?)`, 'i'), `CREATE TABLE ${d.qt(to)}`);
+    return s.replace(new RegExp(`^CREATE (UNIQUE )?INDEX\\s+("?)([^"\\s]+)\\2\\s+ON\\s+("?${esc}"?)`, 'i'), (_m, u, _q, name) => `CREATE ${u ?? ''}INDEX ${d.q(`${name}_${to}`)} ON ${d.qt(to)}`);
   });
 }
 
@@ -426,7 +452,7 @@ function IndexTab({ conn, table, info, onChanged }: TabProps) {
               </div>
               {!i.auto && <button className="btn sm danger" onClick={async () => {
                 if (!(await confirm(`인덱스 "${i.name}" 를 삭제할까요?`))) return;
-                const r = await dropIndex(conn, i.name);
+                const r = await dropIndex(conn, i.name, table);
                 toast(r.ok ? '인덱스 삭제됨' : `실패: ${errorText(r)}`, r.ok ? 'ok' : 'err'); if (r.ok) onChanged();
               }}>삭제</button>}
             </div>
@@ -435,7 +461,7 @@ function IndexTab({ conn, table, info, onChanged }: TabProps) {
         </div>
       </div>
       {ts ? <p className="muted small">시계열 테이블은 보조 인덱스를 지원하지 않습니다 — 시간 조건은 시간 범위 스캔으로 처리됩니다.</p> : (
-        <CreateIndexForm table={table} columns={info.columns ?? []} onCreate={async (sql) => {
+        <CreateIndexForm table={table} columns={info.columns ?? []} d={dialectOf(conn)} onCreate={async (sql) => {
           const r = await goQuery(conn, sql, undefined, { mode: 'exec' });
           toast(r.ok ? '인덱스 생성됨' : `실패: ${errorText(r)}`, r.ok ? 'ok' : 'err');
           if (r.ok) onChanged();
@@ -464,12 +490,15 @@ function TransferTab({ conn, table, info, onChanged }: TabProps) {
       if (fmt === 'sql' && !where.trim()) {
         downloadText(`${table}-${stamp}.sql`, await dumpSql(conn, setExporting, [table]), 'application/sql');
       } else {
-        const { columns, rows } = await readAll(conn, table, (n) => setExporting(`${n}행 읽음…`), 500, where);
+        const d = dialectOf(conn);
+        const ident = identityOf(d, info);
+        const order = ident?.kind === 'rowid' ? ident.expr : ident?.kind === 'pk' ? ident.columns.map(d.q).join(', ') : undefined;
+        const { columns, rows } = await readAll(conn, table, (n) => setExporting(`${n}행 읽음…`), 500, where, order);
         const docs = rows.map((r) => Object.fromEntries(columns.map((c, i) => [c, r[i]])));
         if (fmt === 'csv') downloadText(`${table}-${stamp}.csv`, '﻿' + toCsv(docs), 'text/csv');
         else if (fmt === 'json') downloadText(`${table}-${stamp}.json`, JSON.stringify(docs, null, 2));
-        else if (fmt === 'jsonl') downloadText(`${table}-${stamp}.jsonl`, docs.map((d) => JSON.stringify(d)).join('\n'));
-        else downloadText(`${table}-${stamp}.sql`, rows.map((r) => `INSERT INTO ${qi(table)} (${columns.map(qi).join(', ')}) VALUES (${r.map(literal).join(', ')});`).join('\n'), 'application/sql');
+        else if (fmt === 'jsonl') downloadText(`${table}-${stamp}.jsonl`, docs.map((x) => JSON.stringify(x)).join('\n'));
+        else downloadText(`${table}-${stamp}.sql`, rows.map((r) => `INSERT INTO ${d.qt(table)} (${columns.map(d.q).join(', ')}) VALUES (${r.map(d.literal).join(', ')});`).join('\n'), 'application/sql');
         toast(`${docs.length}행 내보냄`, 'ok');
       }
     } catch (e) { toast((e as Error).message, 'err'); } finally { setExporting(''); }
@@ -486,7 +515,7 @@ function TransferTab({ conn, table, info, onChanged }: TabProps) {
           <input className="inp mono grow" placeholder="WHERE 조건 (선택, 비우면 전체)" value={where} onChange={(e) => setWhere(e.target.value)} />
           <button className="btn primary sm" disabled={!!exporting} onClick={doExport}>{exporting || '내보내기'}</button>
         </div>
-        <p className="muted small" style={{ marginBottom: 0 }}>{fmt === 'sql' ? (where.trim() ? '조건에 맞는 행의 INSERT 문을 만듭니다.' : 'CREATE TABLE·인덱스 정의와 모든 행의 INSERT 문을 만듭니다. 다른 BangDB 에서 "SQL 스크립트 실행"으로 복원할 수 있습니다.') : '서버 행 제한과 상관없이 500행씩 나눠 전체를 읽습니다.'}</p>
+        <p className="muted small" style={{ marginBottom: 0 }}>{fmt === 'sql' ? (where.trim() ? '조건에 맞는 행의 INSERT 문을 만듭니다.' : `CREATE TABLE·인덱스 정의와 모든 행의 INSERT 문을 만듭니다. 다른 ${dialectOf(conn).label} 에서 "SQL 스크립트 실행"으로 복원할 수 있습니다.`) : '서버 행 제한과 상관없이 500행씩 나눠 전체를 읽습니다.'}</p>
       </div>
       {!isView && <ImportCard conn={conn} table={table} info={info} onChanged={onChanged} />}
     </>
@@ -539,7 +568,9 @@ function ImportCard({ conn, table, info, onChanged }: TabProps) {
       <div className="row wrap" style={{ marginBottom: 8 }}>
         <label className="btn sm">파일 선택<input type="file" accept=".csv,.tsv,.txt,.json,.jsonl,.ndjson" style={{ display: 'none' }} onChange={pick} /></label>
         <div className="seg">
-          {([['insert', 'INSERT'], ['ignore', '중복은 건너뛰기'], ['replace', '중복은 덮어쓰기']] as [InsertMode, string][]).map(([m, l]) => <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{l}</button>)}
+          {([['insert', 'INSERT'], ['ignore', '중복은 건너뛰기'], ['replace', '중복은 덮어쓰기']] as [InsertMode, string][])
+            .filter(([m]) => insertModes(dialectOf(conn)).includes(m))
+            .map(([m, l]) => <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{l}</button>)}
         </div>
         <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={emptyNull} onChange={(e) => setEmptyNull(e.target.checked)} /> 빈 칸은 NULL</label>
       </div>
@@ -576,7 +607,8 @@ function DdlTab({ conn, table, info, base, onChanged }: TabProps & { base: strin
   const [editView, setEditView] = useState(false);
   const [preview, setPreview] = useState<Record<string, unknown>[] | null>(null);
   const isView = info.kind === 'view';
-  const viewSelect = isView ? (info.sql ?? '').replace(/^CREATE VIEW\s+("(?:[^"]|"")+"|\S+)\s+(\([^)]*\)\s+)?AS\s+/i, '').replace(/;\s*$/, '') : '';
+  const d = dialectOf(conn);
+  const select = isView ? viewSelect(info.sql ?? '') : '';
   return (
     <>
       <div className="row wrap" style={{ marginBottom: 8 }}>
@@ -590,10 +622,10 @@ function DdlTab({ conn, table, info, base, onChanged }: TabProps & { base: strin
       </div>
       <pre className="out">{info.sql}</pre>
       {editView && (
-        <CreateViewModal replace initialName={table} initialSelect={viewSelect} onClose={() => setEditView(false)}
+        <CreateViewModal replace initialName={table} initialSelect={select} d={d} onClose={() => setEditView(false)}
           onPreview={async (s) => { const r = await goQuery(conn, s, undefined, { limit: 5 }); if (r.ok) setPreview(goRows(r.data)); else toast(errorText(r), 'err'); }}
           onCreate={async (sql) => {
-            const r = await goQuery(conn, `BEGIN;\nDROP VIEW ${qi(table)};\n${sql};\nCOMMIT;`, undefined, { mode: 'exec' });
+            const r = await execStatements(conn, d.replaceView ? [sql] : [`DROP VIEW ${d.qt(table)}`, sql]);
             if (!r.ok) { toast(`실패: ${errorText(r)}`, 'err'); return false; }
             toast('뷰 저장됨', 'ok'); onChanged(); return true;
           }} />

@@ -1,7 +1,32 @@
 export type AuthMode = 'none' | 'apikey' | 'basic' | 'login';
 
-/** Which server the connection talks to: BangDB 2.0 REST (bangdb.com) or knoxxr/bangdb's JSON HTTP API. */
-export type ServerKind = 'rest' | 'go';
+/**
+ * Which server the connection talks to: BangDB 2.0 REST (bangdb.com),
+ * knoxxr/bangdb's JSON HTTP API, or a database reached through the app's
+ * gateway (proxy/gateway): SQL databases and MongoDB / Redis.
+ */
+export type ServerKind = 'rest' | 'go' | GatewayKind;
+export type SqlGatewayKind = 'postgres' | 'mysql' | 'mssql' | 'sqlite';
+export type GatewayKind = SqlGatewayKind | 'mongodb' | 'redis';
+
+/** Connection settings the gateway uses to open the database. */
+export interface DbParams {
+  host?: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  /** Default database (PostgreSQL / MySQL / SQL Server / MongoDB) or Redis DB number. */
+  database?: string;
+  /** Connection string instead of the fields above (postgres://, mysql://, mongodb://, redis://). */
+  uri?: string;
+  /** SQLite file, relative to the gateway's SQLITE_ROOT. */
+  file?: string;
+  ssl?: boolean;
+  /** Accept self-signed certificates. */
+  sslInsecure?: boolean;
+  /** MongoDB authSource. */
+  authSource?: string;
+}
 
 export interface AuthConfig {
   mode: AuthMode;
@@ -64,6 +89,10 @@ export interface Connection {
   useProxy: boolean;
   endpointOverrides: Partial<Record<EndpointKey, EndpointDef>>;
   createdAt: number;
+  /** Gateway kinds: database settings. `baseUrl` is then the gateway (empty: the server that serves this app). */
+  db?: DbParams;
+  /** Gateway kinds: value of the gateway's GATEWAY_TOKEN. */
+  gatewayToken?: string;
 }
 
 export interface ApiResult<T = unknown> {
@@ -143,6 +172,8 @@ export interface GoTableInfo {
   /** "memory", "timeseries" or absent (B+tree). */
   store?: string;
   sql?: string;
+  /** Hidden row identifier the gateway reports (SQLite rowid, PostgreSQL ctid). */
+  rowid?: 'rowid' | 'ctid';
 }
 
 export interface GoQueryResponse {

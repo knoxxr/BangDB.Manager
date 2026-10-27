@@ -1,3 +1,15 @@
+## 미출시 — 주요 데이터베이스 지원 (DB 게이트웨이)
+
+PostgreSQL, MySQL/MariaDB, SQL Server, SQLite, MongoDB, Redis 에 접속해 관리할 수 있습니다. 브라우저·휴대폰은 이 DB 들에 직접 접속할 수 없어서, 앱을 서비스하는 서버(`npm run dev`, `proxy/server.mjs`, Docker)에 **DB 게이트웨이**(`/gw/*`)를 넣었습니다.
+
+- **관계형 DB**: BangDB (Go) 와 같은 그리드 편집(기본 키 기준, 없으면 SQLite `rowid` / PostgreSQL `ctid`), 테이블 만들기(DB 별 타입·자동 증가·정렬 규칙), 컬럼 추가·이름 변경·삭제, **컬럼 타입·NOT NULL·DEFAULT 수정**(PostgreSQL·MySQL·SQL Server), 인덱스, 뷰(CREATE OR REPLACE / CREATE OR ALTER), 테이블 복제, 가져오기·내보내기, SQL 콘솔(DB 별 예제, EXPLAIN / EXPLAIN ANALYZE / EXPLAIN QUERY PLAN)
+- **서버 화면**: 데이터베이스 목록·크기, DB 만들기·삭제, 서버 통계, 유지 보수(PostgreSQL VACUUM/ANALYZE/REINDEX, MySQL ANALYZE/CHECK/OPTIMIZE TABLE, SQL Server sp_updatestats/DBCC CHECKDB, SQLite integrity_check/VACUUM), DB 별 덤프·복원(외래 키 순서, PostgreSQL 시퀀스 재설정, SQL Server IDENTITY_INSERT)
+- **MongoDB**: DB·컬렉션 관리(일반·capped·시계열, $jsonSchema 검증), 문서 조회(필터·정렬·필드 선택·페이지)·편집·추가·삭제(Extended JSON 으로 ObjectId·날짜 보존), 집계 파이프라인, 인덱스(unique·sparse·TTL), 표본 스키마, 가져오기·내보내기, DB 명령
+- **Redis**: DB 0~15 선택, 키 검색(SCAN·패턴·타입), string/hash/list/set/zset/stream 편집기, TTL·이름 변경·삭제, 새 키, 명령 콘솔(히스토리), INFO
+- 연결 편집: 호스트·포트·계정 또는 연결 문자열, TLS(기본 인증서 검증, 자체 서명용 "검증 안 함" 옵션), 게이트웨이 주소·토큰
+- 게이트웨이 보안: `GATEWAY_TOKEN` 이 없으면 이 PC 의 같은 주소에서 연 앱만 허용(기본 닫힘), 토큰은 상수 시간 비교, `GATEWAY_ALLOWED_HOSTS` 로 접속 대상 제한, SQLite 는 `SQLITE_ROOT` 밖(심볼릭 링크 포함)·ATTACH·VACUUM INTO 거부. `GATEWAY_MAX_BODY`. 릴리즈 zip 과 Docker 이미지에 드라이버 포함, Node.js 22.13+ 필요
+- 수정: 테이블을 옮겨 다닐 때 이전 테이블의 키로 조회가 한 번 실행되던 문제
+
 ## 미출시 — BangDB (Go) 관리 화면 개편
 
 BangDB (Go) 연결의 화면을 새로 만들었습니다. HTTP API 로 쓸 수 있는 SQL 기능을 모두 화면에서 다룹니다.

@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { onRequest } from '../api/bangdb';
-import type { Connection, RequestLogEntry } from '../api/types';
+import type { Connection, DbParams, GatewayKind, RequestLogEntry, ServerKind } from '../api/types';
 
 const KEY = 'bangdb-manager.connections.v1';
 const MAX_LOG = 200;
@@ -29,8 +29,33 @@ function persist(list: Connection[]) {
   }
 }
 
+const GATEWAY_KINDS: ServerKind[] = ['postgres', 'mysql', 'mssql', 'sqlite', 'mongodb', 'redis'];
+export const isGatewayKind = (k: ServerKind | undefined): k is GatewayKind => !!k && GATEWAY_KINDS.includes(k);
+
+/** Database a gateway connection opens first, when the user named none. */
+const FALLBACK_DB: Record<GatewayKind, string> = { postgres: 'postgres', mysql: '', mssql: 'master', sqlite: 'main', mongodb: 'test', redis: '0' };
+
 export function normalize(c: Partial<Connection>): Connection {
-  const kind = c.kind === 'go' ? 'go' : 'rest';
+  const kind: ServerKind = c.kind === 'go' || isGatewayKind(c.kind) ? c.kind : 'rest';
+  if (isGatewayKind(kind)) {
+    const db: DbParams = { ...(c.db ?? {}) };
+    if (db.port !== undefined && !Number(db.port)) delete db.port;
+    const defaultDb = kind === 'sqlite' ? 'main' : (db.database?.trim() || FALLBACK_DB[kind] || 'main');
+    return {
+      id: c.id ?? newId(),
+      name: c.name?.trim() || `${db.host || db.file || kind}${db.database ? `/${db.database}` : ''}`,
+      kind,
+      baseUrl: c.baseUrl?.trim() ? withScheme(c.baseUrl.trim().replace(/\/+$/, '')) : '',
+      defaultDb,
+      databases: [defaultDb],
+      auth: { mode: 'none', headerName: '', tokenField: 'token' },
+      useProxy: false,
+      endpointOverrides: {},
+      createdAt: c.createdAt ?? Date.now(),
+      db,
+      gatewayToken: c.gatewayToken?.trim() || undefined
+    };
+  }
   const defaultDb = c.defaultDb?.trim() || (kind === 'go' ? 'main' : 'mydb');
   const dbs = kind === 'go' ? [defaultDb] : Array.from(new Set([defaultDb, ...(c.databases ?? [])].filter(Boolean)));
   return {
@@ -120,4 +145,13 @@ export function useStore(): State {
 export function useConnection(id: string | undefined): Connection | undefined {
   const { connections } = useStore();
   return connections.find((c) => c.id === id);
+}
+
+/**
+ * The connection with the database chosen in the URL (/c/:id/db/:db) applied:
+ * gateway connections open that database instead of their default one.
+ */
+export function useDbConnection(id: string | undefined, db: string | undefined): Connection | undefined {
+  const c = useConnection(id);
+  return useMemo(() => (c && db && isGatewayKind(c.kind) && c.kind !== 'sqlite' && db !== c.db?.database ? { ...c, db: { ...c.db, database: db } } : c), [c, db]);
 }
