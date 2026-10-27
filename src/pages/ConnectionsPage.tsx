@@ -220,7 +220,7 @@ function GatewayFields({ c, up }: { c: Connection; up: (p: Partial<Connection>) 
         <>
           <Field label="SQLite 파일 (게이트웨이의 SQLITE_ROOT 기준 경로)">
             <div className="row">
-              <input className="mono grow" value={d.file ?? ''} placeholder="data/app.db" onChange={(e) => set({ file: e.target.value })} />
+              <input className="mono grow" value={d.file ?? ''} placeholder="app.db" onChange={(e) => set({ file: e.target.value })} />
               <button className="btn sm" onClick={async () => { const r = await gwSqliteFiles(normalize(c)); if (r.ok) setFiles(r.data); }}>찾기</button>
             </div>
           </Field>

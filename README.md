@@ -100,8 +100,8 @@ bangdb -http 0.0.0.0:18081 -password s3cret app.db     # 스마트폰에서 접�
 | 환경 변수 | 뜻 |
 |---|---|
 | `GATEWAY_TOKEN` | 요청의 `x-gateway-token` 헤더가 이 값과 같아야 합니다 (연결 편집 → 게이트웨이 토큰). **설정하지 않으면 게이트웨이는 닫혀 있고**, 이 PC 에서 같은 주소로 연 앱(예: `http://localhost:5173`)의 요청만 받습니다. 휴대폰·다른 PC·Docker 에서 쓰려면 꼭 설정하세요. |
-| `GATEWAY_ALLOWED_HOSTS` | 쉼표로 구분한 DB 호스트 목록. 설정하면 그 밖의 호스트로는 접속하지 않습니다 (예: `db1.local,10.0.0.5`). |
-| `SQLITE_ROOT` | 게이트웨이가 여는 SQLite 파일의 루트 폴더 (기본: 실행 폴더, Docker: `/data`). 심볼릭 링크를 풀어 그 밖을 가리키는 경로는 거부하고, `ATTACH`·`DETACH`·`VACUUM INTO` 도 막습니다. |
+| `GATEWAY_ALLOWED_HOSTS` | 쉼표로 구분한 DB 호스트 목록. 설정하면 그 밖의 호스트로는 접속하지 않고, 연결 문자열(URI)은 받지 않습니다(호스트·포트 칸만) (예: `db1.local,10.0.0.5`). |
+| `SQLITE_ROOT` | 게이트웨이가 여는 SQLite 파일의 폴더 (기본: 실행 폴더의 `data/`, Docker: `/data`). 이름이 `.db`·`.sqlite`·`.sqlite3`·`.db3` 인 파일만 열고, 심볼릭 링크를 풀어 그 밖을 가리키는 경로는 거부하고, `ATTACH`·`DETACH`·`VACUUM INTO` 도 막습니다. |
 | `GATEWAY_MAX_BODY` | 요청 본문 최대 크기 (기본 32 MiB) |
 
 TLS 는 기본으로 인증서를 검증합니다. 자체 서명 인증서는 연결 편집에서 "인증서 검증 안 함"을 켜야 합니다. 비밀번호를 포함한 연결 정보는 기기의 브라우저 저장소에만 저장되고, 게이트웨이는 요청마다 받아 메모리의 연결 풀에만 둡니다.

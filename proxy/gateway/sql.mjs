@@ -2,8 +2,8 @@
 // app's grid, structure and console pages work unchanged:
 //   query  -> { columns, types, rows: [[...]], rows_affected, last_insert_id, truncated }
 //   tables -> [{ name, kind, columns, indexes, primaryKey, sql, rowid? }]
-import { existsSync, realpathSync } from 'node:fs';
-import { dirname, relative, resolve, sep } from 'node:path';
+import { existsSync, mkdirSync, realpathSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { bindParams, decodeArg, encodeValue, returnsRows, splitStatements } from './params.mjs';
 
 const encodeRow = (r) => r.map(encodeValue);
@@ -430,7 +430,9 @@ function msDecl(r) {
 
 // ============================================================ SQLite (node:sqlite)
 
-const SQLITE_ROOT = resolve(process.env.SQLITE_ROOT || process.cwd());
+// a dedicated folder by default — never the working directory, which holds the served dist/
+const SQLITE_ROOT = resolve(process.env.SQLITE_ROOT || join(process.cwd(), 'data'));
+const SQLITE_EXT = /\.(db|sqlite|sqlite3|db3)$/i;
 
 const outside = () => Object.assign(new Error(`SQLITE_ROOT(${SQLITE_ROOT}) 밖의 파일은 열 수 없습니다`), { status: 403 });
 const inside = (root, p) => p === root || p.startsWith(root + sep);
@@ -438,15 +440,17 @@ const inside = (root, p) => p === root || p.startsWith(root + sep);
 /**
  * Resolve a SQLite file inside SQLITE_ROOT (the gateway never opens files
  * outside it). Symlinks are resolved first, so a link inside the root that
- * points elsewhere is refused too.
+ * points elsewhere is refused too. Only .db / .sqlite / .sqlite3 / .db3 names.
  */
 export function sqlitePath(file) {
   if (!file) throw Object.assign(new Error('SQLite 파일 경로를 지정하세요'), { status: 400 });
   if (file === ':memory:') return file;
   if (/^file:/i.test(file)) throw outside(); // URI filenames could name other files or options
+  if (!SQLITE_EXT.test(file)) throw Object.assign(new Error('SQLite 파일은 .db, .sqlite, .sqlite3, .db3 이름만 열 수 있습니다'), { status: 403 });
   const p = resolve(SQLITE_ROOT, file);
   if (!inside(SQLITE_ROOT, p)) throw outside();
-  const root = existsSync(SQLITE_ROOT) ? realpathSync(SQLITE_ROOT) : SQLITE_ROOT;
+  mkdirSync(SQLITE_ROOT, { recursive: true });
+  const root = realpathSync(SQLITE_ROOT);
   const real = existsSync(p) ? realpathSync(p) : resolve(realpathSync(existingParent(dirname(p))), relative(existingParent(dirname(p)), p));
   if (!inside(root, real)) throw outside();
   return real;

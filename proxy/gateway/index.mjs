@@ -152,10 +152,10 @@ function gate(req) {
 const ALLOWED_HOSTS = (process.env.GATEWAY_ALLOWED_HOSTS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 function checkHost(conn) {
   if (!ALLOWED_HOSTS.length || conn.kind === 'sqlite') return;
-  let host = conn.host || '127.0.0.1';
-  if (conn.uri) {
-    try { host = new URL(conn.uri).hostname; } catch { host = /(?:Server|Data Source)\s*=\s*(?:tcp:)?([^,;\\]+)/i.exec(conn.uri)?.[1] ?? ''; }
-  }
+  // connection strings can name other hosts in ways only each driver parses
+  // (query parameters, multi-host lists, SRV records): refuse them outright
+  if (conn.uri) throw Object.assign(new Error('GATEWAY_ALLOWED_HOSTS 가 설정된 게이트웨이는 연결 문자열을 받지 않습니다. 호스트·포트 칸을 쓰세요.'), { status: 403, code: 'host_not_allowed' });
+  const host = conn.host || '127.0.0.1';
   if (!ALLOWED_HOSTS.includes(String(host).toLowerCase().replace(/^\[|\]$/g, ''))) {
     throw Object.assign(new Error(`GATEWAY_ALLOWED_HOSTS 에 없는 호스트입니다: ${host}`), { status: 403, code: 'host_not_allowed' });
   }

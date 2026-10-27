@@ -52,6 +52,8 @@ describe('SQLite sandbox', () => {
     expect(() => sqlitePath('../outside.db')).toThrow(/SQLITE_ROOT/);
     expect(() => sqlitePath('file:/etc/passwd?mode=ro')).toThrow(/SQLITE_ROOT/);
     expect(sqlitePath('sub/new.db').startsWith(sqliteRoot())).toBe(true);
+    expect(() => sqlitePath('index.html')).toThrow(/\.db/);
+    expect(sqliteRoot().endsWith('data')).toBe(true);
   });
   it('refuses statements that reach other files', () => {
     expect(() => checkSqliteStatement("SELECT 1; ATTACH DATABASE '/tmp/x.db' AS x")).toThrow(/ATTACH/);

@@ -6,3 +6,4 @@ ios
 .DS_Store
 *.log
 .playwright-mcp
+data/
