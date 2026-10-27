@@ -1,7 +1,7 @@
 {
   "name": "bangdb-manager-gateway",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Static server, CORS proxy and database gateway for BangDB Manager",
   "type": "module",
   "scripts": {
