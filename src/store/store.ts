@@ -37,7 +37,7 @@ export function normalize(c: Partial<Connection>): Connection {
     id: c.id ?? newId(),
     name: c.name?.trim() || c.baseUrl || 'BangDB',
     kind,
-    baseUrl: (c.baseUrl ?? 'http://127.0.0.1:18080').trim().replace(/\/+$/, ''),
+    baseUrl: withScheme((c.baseUrl ?? 'http://127.0.0.1:18080').trim().replace(/\/+$/, '')),
     defaultDb,
     databases: dbs,
     auth: {
@@ -54,6 +54,9 @@ export function normalize(c: Partial<Connection>): Connection {
     createdAt: c.createdAt ?? Date.now()
   };
 }
+
+/** "host:port" → "http://host:port" (fetch rejects URLs without a scheme). */
+export const withScheme = (url: string) => (url && !/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? `http://${url}` : url);
 
 export function newId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto

@@ -45,6 +45,49 @@ function asDoc(v: unknown): Record<string, unknown> {
   return v as Record<string, unknown>;
 }
 
+/** Parse CSV (RFC 4180: quoted fields, doubled quotes, CRLF) into rows of fields. */
+export function parseCsv(text: string, sep = ','): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let f = '';
+  let q = false;
+  const t = text.replace(/^\uFEFF/, '');
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) {
+      if (ch === '"') {
+        if (t[i + 1] === '"') { f += '"'; i++; } else q = false;
+      } else f += ch;
+    } else if (ch === '"' && f === '') q = true;
+    else if (ch === sep) { row.push(f); f = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && t[i + 1] === '\n') i++;
+      row.push(f); f = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else f += ch;
+  }
+  if (f !== '' || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+
+/** CSV with a header row → documents; empty fields become null when `emptyAsNull`. */
+export function csvToDocs(text: string, opts: { sep?: string; emptyAsNull?: boolean } = {}): Record<string, unknown>[] {
+  const sep = opts.sep ?? (/\t/.test(text.split(/\r?\n/, 1)[0] ?? '') ? '\t' : ',');
+  const [head, ...rows] = parseCsv(text, sep);
+  if (!head) return [];
+  const cols = head.map((h) => h.trim());
+  return rows.map((r) => {
+    const o: Record<string, unknown> = {};
+    cols.forEach((c, i) => {
+      if (!c) return;
+      const v = r[i] ?? '';
+      o[c] = v === '' && opts.emptyAsNull !== false ? null : v;
+    });
+    return o;
+  });
+}
+
 /** Primary key of a document as BangDB returns it. */
 export function docKey(doc: Record<string, unknown>): string | undefined {
   const v = doc._pk ?? doc.pk ?? doc.key ?? doc._id;

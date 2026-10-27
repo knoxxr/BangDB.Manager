@@ -1,3 +1,18 @@
+## 미출시 — BangDB (Go) 관리 화면 개편
+
+BangDB (Go) 연결의 화면을 새로 만들었습니다. HTTP API 로 쓸 수 있는 SQL 기능을 모두 화면에서 다룹니다.
+
+- **데이터 그리드**: 셀을 눌러 바로 수정(Enter 다음 행, Tab 다음 칸, Esc 취소), 행 추가·여러 행 삭제, 변경을 모아 한 트랜잭션으로 저장(Ctrl+S, 실패하면 전부 롤백). 숨은 `rowid` 로 행을 식별하므로 기본 키가 없는 테이블, 복합 키, 인메모리·시계열 테이블도 편집됩니다. 정렬, 페이지 이동, 빠른 검색, WHERE 필터. 뷰는 읽기 전용
+- **행 폼**: 컬럼 타입별 입력(정수·실수·BOOLEAN 선택·JSON 정렬/검증·BLOB 파일), 기본값/NULL 선택, 행 복제
+- **구조**: 컬럼 추가(ALTER TABLE ADD COLUMN, NOT NULL+DEFAULT, COLLATE, UNIQUE 인덱스 동시 생성)·이름 변경·삭제, 테이블 이름 변경·복제·모든 행 삭제·DROP, ANALYZE, 테이블 제약 표시
+- **테이블 만들기**: 컬럼별 PRIMARY KEY(복합)·AUTOINCREMENT·NOT NULL·UNIQUE·DEFAULT·COLLATE·CHECK·외래 키(ON DELETE), 테이블 UNIQUE/CHECK, `USING memory`(persist)·`USING timeseries`(time_column, time_unit, retention, block_rows), SQL 미리보기와 직접 편집
+- **인덱스**: 컬럼 순서를 골라 (UNIQUE) 인덱스 생성, 삭제, ANALYZE 통계 표시
+- **뷰**: 만들기·수정(DROP+CREATE 를 한 트랜잭션으로)·삭제, 미리보기
+- **가져오기·내보내기**: CSV/TSV/JSON/JSONL 가져오기(미리보기, 없는 컬럼 제외, INSERT / OR IGNORE / OR REPLACE, 200행 묶음), CSV/JSON/JSONL/SQL 로 전체 또는 조건부 내보내기
+- **서버 개요**: 통계 카드(캐시 적중률, WAL, 커밋, API 카운터), VACUUM, ANALYZE, 전체 SQL 덤프(외래 키 순서), SQL 스크립트 실행·복원(BangDB/SQLite 덤프)
+- **SQL 콘솔**: 스키마 브라우저, BangDB 기능별 예제 SQL, EXPLAIN / EXPLAIN ANALYZE, 매개변수(`?`, `:name`), 선택 영역만 실행, 결과 CSV/JSON 저장
+- 서버 오류 메시지(`{"error"}`)를 그대로 표시, `http://` 없이 입력한 서버 주소 자동 보정
+
 ## v0.2.0 — BangDB (Go) 지원
 
 [knoxxr/bangdb](https://github.com/knoxxr/bangdb)(Go 임베디드 관계형 DB)를 관리할 수 있습니다. 서버를 `bangdb -http :18081 -password <pw> app.db` 로 실행하면(`http-api` 브랜치의 JSON HTTP API) 브라우저·스마트폰에서 프록시 없이 직접 연결됩니다.

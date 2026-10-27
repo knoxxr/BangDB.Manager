@@ -6,6 +6,7 @@ const I = {
   db: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>,
   sql: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 17l6-5-6-5M12 19h8"/></svg>,
   console: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15l3-3-3-3M12 15h5"/></svg>,
+  chart: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>,
   info: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
 };
 
@@ -14,9 +15,11 @@ export default function Layout() {
   const { connections } = useStore();
   const active = connections.find((c) => c.id === connId) ?? connections[0];
   const base = active ? `/c/${active.id}` : undefined;
+  const isGo = active?.kind === 'go';
   const links = [
     { to: '/connections', label: '서버', icon: I.server },
-    { to: base ? `${base}/dbs` : '/connections', label: 'DB', icon: I.db, disabled: !base },
+    { to: base ? `${base}/dbs` : '/connections', label: isGo ? '개요' : 'DB', icon: isGo ? I.chart : I.db, disabled: !base },
+    ...(isGo ? [{ to: `${base}/db/${encodeURIComponent(active!.defaultDb)}`, label: '테이블', icon: I.db, disabled: false, end: true }] : []),
     { to: base ? `${base}/db/${encodeURIComponent(active!.defaultDb)}/query` : '/connections', label: 'SQL', icon: I.sql, disabled: !base },
     { to: base ? `${base}/console` : '/connections', label: 'REST', icon: I.console, disabled: !base },
     { to: '/about', label: '정보', icon: I.info }
@@ -25,7 +28,7 @@ export default function Layout() {
     <nav className={cls}>
       {cls === 'sidenav' && <div className="brand">BangDB Manager</div>}
       {links.map((l) => (
-        <NavLink key={l.label} to={l.to} className={({ isActive }) => (isActive && !l.disabled ? 'active' : '')} style={l.disabled ? { opacity: 0.4 } : undefined}>
+        <NavLink key={l.label} to={l.to} end={'end' in l} className={({ isActive }) => (isActive && !l.disabled ? 'active' : '')} style={l.disabled ? { opacity: 0.4 } : undefined}>
           {l.icon}<span>{l.label}</span>
         </NavLink>
       ))}

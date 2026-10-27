@@ -114,7 +114,24 @@ export interface ColumnInfo {
   pk?: boolean;
   unique?: boolean;
   autoinc?: boolean;
+  /** NOCASE, RTRIM or empty (binary). */
+  collate?: string;
   default?: string;
+  /** Builder-only fields (not reported by /v1/tables): column CHECK and REFERENCES. */
+  check?: string;
+  refTable?: string;
+  refColumn?: string;
+  onDelete?: string;
+}
+
+/** Storage of a knoxxr/bangdb table: B+tree (default), memory or timeseries. */
+export interface StorageSpec {
+  using: '' | 'memory' | 'timeseries';
+  persist?: boolean;
+  timeColumn?: string;
+  timeUnit?: 's' | 'ms' | 'us';
+  retention?: string;
+  blockRows?: number;
 }
 
 export interface GoTableInfo {
@@ -123,6 +140,8 @@ export interface GoTableInfo {
   columns?: ColumnInfo[];
   indexes?: { name: string; table: string; columns?: string[]; column?: string; unique?: boolean; auto?: boolean }[];
   primaryKey?: string[];
+  /** "memory", "timeseries" or absent (B+tree). */
+  store?: string;
   sql?: string;
 }
 

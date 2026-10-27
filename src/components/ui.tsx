@@ -29,8 +29,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export function describeResult(r: ApiResult): string {
   if (r.error) return r.error;
   if (!r.ok) {
-    const msg = typeof r.data === 'object' && r.data && 'msg' in (r.data as object)
-      ? String((r.data as Record<string, unknown>).msg)
+    const d = r.data as Record<string, unknown> | null;
+    const msg = d && typeof d === 'object' && ('error' in d || 'msg' in d)
+      ? String(d.error ?? d.msg).replace(/^bangdb: /, '')
       : r.text.slice(0, 160);
     return `HTTP ${r.status} ${msg}`.trim();
   }
@@ -38,7 +39,7 @@ export function describeResult(r: ApiResult): string {
 }
 
 // ---------- Modal ----------
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -46,7 +47,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   }, [onClose]);
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <div className={`modal${wide ? ' wide' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <h2>{title}</h2>
         {children}
       </div>
@@ -56,18 +57,38 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 
 // ---------- Confirm ----------
 export function useConfirm() {
-  const [req, setReq] = useState<{ text: string; resolve: (v: boolean) => void } | null>(null);
-  const confirm = useCallback((text: string) => new Promise<boolean>((resolve) => setReq({ text, resolve })), []);
+  const [req, setReq] = useState<{ text: string; ok: string; resolve: (v: boolean) => void } | null>(null);
+  const confirm = useCallback((text: string, ok = '삭제') => new Promise<boolean>((resolve) => setReq({ text, ok, resolve })), []);
   const el = req ? (
     <Modal title="확인" onClose={() => { req.resolve(false); setReq(null); }}>
       <p>{req.text}</p>
       <div className="actions">
         <button className="btn" onClick={() => { req.resolve(false); setReq(null); }}>취소</button>
-        <button className="btn danger" onClick={() => { req.resolve(true); setReq(null); }}>삭제</button>
+        <button className="btn danger" autoFocus onClick={() => { req.resolve(true); setReq(null); }}>{req.ok}</button>
       </div>
     </Modal>
   ) : null;
   return { confirm, confirmEl: el };
+}
+
+// ---------- Prompt ----------
+export function usePrompt() {
+  const [req, setReq] = useState<{ title: string; label: string; value: string; resolve: (v: string | null) => void } | null>(null);
+  const prompt = useCallback((title: string, label: string, value = '') => new Promise<string | null>((resolve) => setReq({ title, label, value, resolve })), []);
+  const close = (v: string | null) => { req?.resolve(v); setReq(null); };
+  const el = req ? (
+    <Modal title={req.title} onClose={() => close(null)}>
+      <Field label={req.label}>
+        <input className="mono" autoFocus value={req.value} onChange={(e) => setReq({ ...req, value: e.target.value })}
+          onKeyDown={(e) => { if (e.key === 'Enter' && req.value.trim()) close(req.value.trim()); }} />
+      </Field>
+      <div className="actions">
+        <button className="btn" onClick={() => close(null)}>취소</button>
+        <button className="btn primary" disabled={!req.value.trim()} onClick={() => close(req.value.trim())}>확인</button>
+      </div>
+    </Modal>
+  ) : null;
+  return { prompt, promptEl: el };
 }
 
 // ---------- JSON output ----------
