@@ -121,6 +121,7 @@ function classify(e) {
 }
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const LOOPBACK_NAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
 const tokenOk = (sent) => {
   if (typeof sent !== 'string') return false;
   const a = Buffer.from(sent), b = Buffer.from(TOKEN);
@@ -136,10 +137,14 @@ const tokenOk = (sent) => {
 function gate(req) {
   if (TOKEN) return tokenOk(req.headers['x-gateway-token']) ? null : { status: 401, code: 'unauthorized', error: '게이트웨이 토큰이 맞지 않습니다' };
   const local = LOOPBACK.has(req.socket?.remoteAddress ?? '');
+  // Host must be a loopback name too: a rebinding domain resolving to 127.0.0.1
+  // would otherwise look like a same-origin page
+  const host = String(req.headers.host ?? '');
+  const hostOk = LOOPBACK_NAMES.has(host.replace(/:\d+$/, '').toLowerCase());
   const origin = req.headers.origin;
   let sameOrigin = !origin;
-  if (origin) { try { sameOrigin = new URL(origin).host === req.headers.host; } catch { sameOrigin = false; } }
-  if (local && sameOrigin) return null;
+  if (origin) { try { sameOrigin = new URL(origin).host.toLowerCase() === host.toLowerCase(); } catch { sameOrigin = false; } }
+  if (local && hostOk && sameOrigin) return null;
   return { status: 403, code: 'gateway_disabled', error: '이 게이트웨이는 GATEWAY_TOKEN 없이 이 PC 의 같은 주소에서 연 앱만 허용합니다. 다른 기기나 주소에서 쓰려면 서버를 GATEWAY_TOKEN=<비밀값> 으로 실행하고 연결 편집에 같은 토큰을 넣으세요.' };
 }
 
