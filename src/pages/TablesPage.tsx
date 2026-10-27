@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createTable, dropTable, extractTables, isSystemTable, listTables } from '../api/bangdb';
-import type { ApiResult, CreateTableSpec, KeyType, TableType } from '../api/types';
+import type { ApiResult, ColumnInfo, CreateTableSpec, KeyType, TableType } from '../api/types';
+import { createTableSql } from '../api/goapi';
 import { TopBar } from '../components/Layout';
 import { Field, Modal, ResultBadge, describeResult, useConfirm, useToast } from '../components/ui';
 import { useConnection } from '../store/store';
@@ -64,7 +65,11 @@ export default function TablesPage() {
         ))}
       </div>
       <button className="fab" onClick={() => setCreating(true)} aria-label="테이블 생성">+</button>
-      {creating && <CreateTableModal onClose={() => setCreating(false)} onCreate={async (spec) => {
+      {creating && conn.kind === 'go' && <CreateSqlTableModal onClose={() => setCreating(false)} onCreate={async (spec) => {
+        const r = await createTable(conn, db, spec);
+        if (r.ok) { toast(`"${spec.table_name}" 생성됨`, 'ok'); setCreating(false); load(); } else toast(`생성 실패: ${describeResult(r)}`, 'err');
+      }} />}
+      {creating && conn.kind === 'rest' && <CreateTableModal onClose={() => setCreating(false)} onCreate={async (spec) => {
         const r = await createTable(conn, db, spec);
         if (r.ok) { toast(`"${spec.table_name}" 생성됨`, 'ok'); setCreating(false); load(); } else toast(`생성 실패: ${describeResult(r)}`, 'err');
       }} />}
@@ -107,3 +112,58 @@ function CreateTableModal({ onClose, onCreate }: { onClose: () => void; onCreate
     </Modal>
   );
 }
+
+type ColDraft = ColumnInfo & { id: number };
+const TYPES = ['INTEGER', 'TEXT', 'REAL', 'BLOB', 'ANY'];
+
+/** CREATE TABLE builder for BangDB (Go): columns with type/PK/NOT NULL/UNIQUE/DEFAULT, or raw SQL. */
+function CreateSqlTableModal({ onClose, onCreate }: { onClose: () => void; onCreate: (s: CreateTableSpec & { columns?: ColumnInfo[]; sql?: string }) => Promise<void> }) {
+  const [name, setName] = useState('');
+  const [cols, setCols] = useState<ColDraft[]>([{ id: 1, name: 'id', decl: 'INTEGER', pk: true }, { id: 2, name: '', decl: 'TEXT' }]);
+  const [rawSql, setRawSql] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const upCol = (id: number, p: Partial<ColumnInfo>) => setCols((l) => l.map((c) => (c.id === id ? { ...c, ...p } : c)));
+  const base: CreateTableSpec = { table_name: name.trim(), table_type: 'NORMAL_TABLE', key_type: 'NORMAL_KEY', key_sz: 0, allow_duplicate: false, allow_rev_idx: false, version_type: 0 };
+  let preview = '';
+  try { preview = name.trim() ? createTableSql({ ...base, columns: cols }) : ''; } catch (e) { preview = `-- ${(e as Error).message}`; }
+  return (
+    <Modal title="테이블 생성 (SQL)" onClose={onClose}>
+      <Field label="테이블 이름"><input className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
+      {rawSql === null ? (
+        <>
+          <div className="muted small" style={{ marginBottom: 6 }}>컬럼</div>
+          {cols.map((c) => (
+            <div key={c.id} className="row wrap" style={{ marginBottom: 6, gap: 6 }}>
+              <input className="mono" placeholder="이름" value={c.name} onChange={(e) => upCol(c.id, { name: e.target.value })} style={{ ...inp, flex: '1 1 110px' }} />
+              <select value={c.decl} onChange={(e) => upCol(c.id, { decl: e.target.value })} style={{ ...inp, width: 100 }}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
+              <label className="check small" style={{ margin: 0 }}><input type="checkbox" checked={!!c.pk} onChange={(e) => upCol(c.id, { pk: e.target.checked })} />PK</label>
+              <label className="check small" style={{ margin: 0 }}><input type="checkbox" checked={!!c.notNull} onChange={(e) => upCol(c.id, { notNull: e.target.checked })} />NOT NULL</label>
+              <label className="check small" style={{ margin: 0 }}><input type="checkbox" checked={!!c.unique} onChange={(e) => upCol(c.id, { unique: e.target.checked })} />UNIQUE</label>
+              <input className="mono" placeholder="DEFAULT" value={c.default ?? ''} onChange={(e) => upCol(c.id, { default: e.target.value })} style={{ ...inp, width: 90 }} />
+              <button className="btn sm ghost" onClick={() => setCols((l) => l.filter((x) => x.id !== c.id))} aria-label="컬럼 삭제">✕</button>
+            </div>
+          ))}
+          <div className="row" style={{ marginBottom: 10 }}>
+            <button className="btn sm" onClick={() => setCols((l) => [...l, { id: Date.now(), name: '', decl: 'TEXT' }])}>+ 컬럼</button>
+            <button className="btn sm ghost" onClick={() => setRawSql(preview)}>SQL 직접 편집</button>
+          </div>
+          {preview && <pre className="out">{preview}</pre>}
+        </>
+      ) : (
+        <Field label="CREATE TABLE SQL"><textarea className="mono" rows={8} value={rawSql} spellCheck={false} onChange={(e) => setRawSql(e.target.value)} /></Field>
+      )}
+      <div className="actions">
+        <button className="btn" onClick={onClose}>취소</button>
+        <button className="btn primary" disabled={busy || (rawSql === null ? !name.trim() : !rawSql.trim())} onClick={async () => {
+          setBusy(true);
+          try {
+            if (rawSql !== null) await onCreate({ ...base, table_name: name.trim() || 'table', sql: rawSql });
+            else { createTableSql({ ...base, columns: cols }); await onCreate({ ...base, columns: cols }); }
+          } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); }
+        }}>생성</button>
+      </div>
+    </Modal>
+  );
+}
+const inp: React.CSSProperties = { padding: '8px 10px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg)' };

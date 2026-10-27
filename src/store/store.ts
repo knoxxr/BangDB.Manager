@@ -30,11 +30,13 @@ function persist(list: Connection[]) {
 }
 
 export function normalize(c: Partial<Connection>): Connection {
-  const defaultDb = c.defaultDb?.trim() || 'mydb';
-  const dbs = Array.from(new Set([defaultDb, ...(c.databases ?? [])].filter(Boolean)));
+  const kind = c.kind === 'go' ? 'go' : 'rest';
+  const defaultDb = c.defaultDb?.trim() || (kind === 'go' ? 'main' : 'mydb');
+  const dbs = kind === 'go' ? [defaultDb] : Array.from(new Set([defaultDb, ...(c.databases ?? [])].filter(Boolean)));
   return {
     id: c.id ?? newId(),
     name: c.name?.trim() || c.baseUrl || 'BangDB',
+    kind,
     baseUrl: (c.baseUrl ?? 'http://127.0.0.1:18080').trim().replace(/\/+$/, ''),
     defaultDb,
     databases: dbs,

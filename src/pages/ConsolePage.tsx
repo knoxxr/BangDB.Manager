@@ -12,7 +12,7 @@ export default function ConsolePage() {
   const { log } = useStore();
   const toast = useToast();
   const [method, setMethod] = useState<HttpMethod>('GET');
-  const [path, setPath] = useState(`/db/${conn?.defaultDb ?? 'mydb'}/list`);
+  const [path, setPath] = useState(conn?.kind === 'go' ? '/v1/tables' : `/db/${conn?.defaultDb ?? 'mydb'}/list`);
   const [body, setBody] = useState('');
   const [res, setRes] = useState<ApiResult | null>(null);
   const [busy, setBusy] = useState(false);

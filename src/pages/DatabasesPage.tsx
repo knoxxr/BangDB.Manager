@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { call, createDb, dropDb, extractTables, listTables } from '../api/bangdb';
+import { createDb, dropDb, extractTables, listTables, serverStats } from '../api/bangdb';
 import type { ApiResult } from '../api/types';
 import { TopBar } from '../components/Layout';
 import { Field, JsonOut, Modal, ResultBadge, describeResult, useConfirm, useToast } from '../components/ui';
@@ -57,8 +57,10 @@ export default function DatabasesPage() {
   return (
     <>
       <TopBar title="데이터베이스" crumbs={[{ to: '/connections', label: '서버' }, { label: conn.name }]}
-        right={<><button className="btn sm ghost" onClick={async () => { setStats('loading'); setStats(await call(conn, 'serverStats')); }}>서버 상태</button><button className="btn sm" onClick={refresh}>새로고침</button><button className="btn primary sm" onClick={() => setAdding('create')}>+ 생성</button></>} />
-      <p className="muted small">BangDB 서버는 보통 bangdb.config 의 DB 하나를 서비스합니다. 목록은 이 앱에 등록된 DB 이름이며, "등록"은 서버에 이미 있는 DB를 목록에만 추가합니다.</p>
+        right={<><button className="btn sm ghost" onClick={async () => { setStats('loading'); setStats(await serverStats(conn)); }}>서버 상태</button><button className="btn sm" onClick={refresh}>새로고침</button>{conn.kind === 'rest' && <button className="btn primary sm" onClick={() => setAdding('create')}>+ 생성</button>}</>} />
+      {conn.kind === 'go'
+        ? <p className="muted small">BangDB (Go) 서버는 파일 하나를 서비스합니다. 아래 항목을 열어 테이블을 관리하세요.</p>
+        : <p className="muted small">BangDB 서버는 보통 bangdb.config 의 DB 하나를 서비스합니다. 목록은 이 앱에 등록된 DB 이름이며, "등록"은 서버에 이미 있는 DB를 목록에만 추가합니다.</p>}
       <div className="list">
         {conn.databases.map((db) => (
           <div key={db} className="item">
@@ -67,13 +69,13 @@ export default function DatabasesPage() {
               <div className="sub">{counts[db] === undefined ? '테이블 수: 새로고침으로 확인' : counts[db] === 'err' ? <span className="danger">조회 실패</span> : `테이블 ${counts[db]}개`}</div>
             </div>
             <button className="btn sm" onClick={() => nav(`/c/${conn.id}/db/${encodeURIComponent(db)}/query`)}>SQL</button>
-            <button className="btn sm ghost" title="목록에서만 제거" onClick={() => store.removeDatabase(conn.id, db)}>숨김</button>
-            <button className="btn sm danger" onClick={() => drop(db)}>DROP</button>
+            {conn.kind === 'rest' && <button className="btn sm ghost" title="목록에서만 제거" onClick={() => store.removeDatabase(conn.id, db)}>숨김</button>}
+            {conn.kind === 'rest' && <button className="btn sm danger" onClick={() => drop(db)}>DROP</button>}
           </div>
         ))}
       </div>
-      <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setAdding('register')}>기존 DB 이름 등록</button>
-      <button className="fab" onClick={() => setAdding('create')} aria-label="DB 생성">+</button>
+      {conn.kind === 'rest' && <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setAdding('register')}>기존 DB 이름 등록</button>}
+      {conn.kind === 'rest' && <button className="fab" onClick={() => setAdding('create')} aria-label="DB 생성">+</button>}
       {adding && (
         <Modal title={adding === 'create' ? 'DB 생성' : '기존 DB 등록'} onClose={() => setAdding(null)}>
           <Field label="DB 이름"><input className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></Field>
@@ -88,7 +90,7 @@ export default function DatabasesPage() {
         <Modal title="서버 상태" onClose={() => setStats(null)}>
           {stats === 'loading' ? <p className="muted">조회 중…</p> : (
             <>
-              <div className="row" style={{ marginBottom: 8 }}><ResultBadge r={stats} /><span className="muted small">GET serverStats (추정 경로)</span></div>
+              <div className="row" style={{ marginBottom: 8 }}><ResultBadge r={stats} /><span className="muted small">{conn.kind === 'go' ? 'GET /v1/stats' : 'GET serverStats (추정 경로)'}</span></div>
               {!stats.ok && <p className="danger small">{describeResult(stats)}</p>}
               <JsonOut value={stats.data ?? ''} />
             </>

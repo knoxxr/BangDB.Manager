@@ -1,5 +1,8 @@
 export type AuthMode = 'none' | 'apikey' | 'basic' | 'login';
 
+/** Which server the connection talks to: BangDB 2.0 REST (bangdb.com) or knoxxr/bangdb's JSON HTTP API. */
+export type ServerKind = 'rest' | 'go';
+
 export interface AuthConfig {
   mode: AuthMode;
   /** Header name used for API key / login token. BangDB docs use x-bang-api-key. */
@@ -40,11 +43,17 @@ export type EndpointKey =
   | 'getDoc'
   | 'delDoc'
   | 'scanDocs'
-  | 'query';
+  | 'query'
+  | 'goHealth'
+  | 'goTables'
+  | 'goTable'
+  | 'goQuery'
+  | 'goStats';
 
 export interface Connection {
   id: string;
   name: string;
+  kind: ServerKind;
   /** e.g. http://192.168.0.10:18080 */
   baseUrl: string;
   defaultDb: string;
@@ -94,4 +103,35 @@ export interface IndexSpec {
   key_type: 'NORMAL_KEY' | 'NORMAL_KEY_LONG';
   allow_duplicate: boolean;
   idx_scope?: string;
+}
+
+/** Column of a knoxxr/bangdb table as /v1/tables reports it. */
+export interface ColumnInfo {
+  name: string;
+  type?: string;
+  decl?: string;
+  notNull?: boolean;
+  pk?: boolean;
+  unique?: boolean;
+  autoinc?: boolean;
+  default?: string;
+}
+
+export interface GoTableInfo {
+  name: string;
+  kind: 'table' | 'view';
+  columns?: ColumnInfo[];
+  indexes?: { name: string; table: string; columns?: string[]; column?: string; unique?: boolean; auto?: boolean }[];
+  primaryKey?: string[];
+  sql?: string;
+}
+
+export interface GoQueryResponse {
+  columns: string[];
+  types: string[];
+  rows: unknown[][];
+  rows_affected: number;
+  last_insert_id: number;
+  truncated: boolean;
+  ms: number;
 }

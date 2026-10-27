@@ -53,8 +53,17 @@ export const DEFAULT_ENDPOINTS: Record<EndpointKey, EndpointDef> = {
     verified: false,
     note: 'Body {skey, ekey, query_json}. The SQL endpoint is the verified way to browse data.'
   },
-  query: { method: 'POST', path: '/db/{db}/query', verified: true, note: 'Body {"sql":"select * from t limit 10"}' }
+  query: { method: 'POST', path: '/db/{db}/query', verified: true, note: 'Body {"sql":"select * from t limit 10"}' },
+  // knoxxr/bangdb JSON HTTP API (bangdb -http :18081)
+  goHealth: { method: 'GET', path: '/v1/health', verified: true, note: 'No authentication.' },
+  goTables: { method: 'GET', path: '/v1/tables', verified: true, note: 'Tables and views with columns, indexes and SQL.' },
+  goTable: { method: 'GET', path: '/v1/tables/{table}', verified: true },
+  goQuery: { method: 'POST', path: '/v1/query', verified: true, note: 'Body {sql, args, mode, limit}' },
+  goStats: { method: 'GET', path: '/v1/stats', verified: true }
 };
+
+export const GO_KEYS: EndpointKey[] = ['goHealth', 'goTables', 'goTable', 'goQuery', 'goStats'];
+export const REST_KEYS: EndpointKey[] = (Object.keys(DEFAULT_ENDPOINTS) as EndpointKey[]).filter((k) => !GO_KEYS.includes(k));
 
 export const ENDPOINT_KEYS = Object.keys(DEFAULT_ENDPOINTS) as EndpointKey[];
 

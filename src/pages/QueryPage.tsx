@@ -12,7 +12,7 @@ function loadHist(): string[] { try { return JSON.parse(localStorage.getItem(HIS
 export default function QueryPage() {
   const { connId, db = '' } = useParams();
   const conn = useConnection(connId);
-  const [stmt, setStmt] = useState('select * from  limit 20');
+  const [stmt, setStmt] = useState(conn?.kind === 'go' ? 'SELECT * FROM  LIMIT 20' : 'select * from  limit 20');
   const [res, setRes] = useState<ApiResult | null>(null);
   const [raw, setRaw] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,7 +48,10 @@ export default function QueryPage() {
       </div>
       {res && !res.ok && <div className="card danger">{describeResult(res)}</div>}
       {res?.ok && (raw ? <JsonOut value={res.data} /> : <DataTable rows={extractRows(res.data)} />)}
-      <p className="muted small" style={{ marginTop: 12 }}>POST /db/{db}/query 에 {'{"sql": "..."}'} 로 전송됩니다. BangDB 의 SQL-like 문법(select/where/limit 등)을 따릅니다.</p>
+      {res?.ok && (res.data as { truncated?: boolean })?.truncated && <p className="warn small">서버 행 수 제한으로 결과가 잘렸습니다. LIMIT 를 지정하세요.</p>}
+      {conn.kind === 'go'
+        ? <p className="muted small" style={{ marginTop: 12 }}>POST /v1/query 에 {'{"sql": "..."}'} 로 전송됩니다. 여러 문장은 ;로 구분하며 마지막 SELECT 의 결과가 표시됩니다. 변경 문장은 rows_affected 로 결과를 확인하세요.</p>
+        : <p className="muted small" style={{ marginTop: 12 }}>POST /db/{db}/query 에 {'{"sql": "..."}'} 로 전송됩니다. BangDB 의 SQL-like 문법(select/where/limit 등)을 따릅니다.</p>}
     </>
   );
 }

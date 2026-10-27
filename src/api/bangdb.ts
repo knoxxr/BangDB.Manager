@@ -1,6 +1,7 @@
 import { fillPath, resolveEndpoint } from './endpoints';
 import { rawRequest } from './http';
-import type { ApiResult, Connection, CreateTableSpec, EndpointKey, IndexSpec, RequestLogEntry } from './types';
+import type { ApiResult, Connection, CreateTableSpec, EndpointKey, GoTableInfo, IndexSpec, RequestLogEntry } from './types';
+import * as go from './goapi';
 
 type Listener = (entry: RequestLogEntry) => void;
 const listeners = new Set<Listener>();
@@ -87,32 +88,44 @@ export function extractToken(data: unknown, field: string): string | undefined {
   return typeof v === 'string' ? v : undefined;
 }
 
-export const listTables = (c: Connection, db: string) => call<TableList>(c, 'listTables', { params: { db } });
+const isGo = (c: Connection) => c.kind === 'go';
+
+export const listTables = (c: Connection, db: string) =>
+  isGo(c) ? (go.goTables(c) as unknown as Promise<ApiResult<TableList>>) : call<TableList>(c, 'listTables', { params: { db } });
 export const createDb = (c: Connection, db: string) => call(c, 'createDb', { params: { db }, body: { db_name: db } });
 export const dropDb = (c: Connection, db: string) => call(c, 'dropDb', { params: { db } });
-export const createTable = (c: Connection, db: string, spec: CreateTableSpec) =>
-  call(c, 'createTable', { params: { db }, body: spec });
-export const dropTable = (c: Connection, db: string, table: string) => call(c, 'dropTable', { params: { db, table } });
-export const tableInfo = (c: Connection, db: string, table: string) => call(c, 'tableInfo', { params: { db, table } });
+export const createTable = (c: Connection, db: string, spec: CreateTableSpec & { columns?: import('./types').ColumnInfo[]; sql?: string }) =>
+  isGo(c) ? go.createTable(c, spec) : call(c, 'createTable', { params: { db }, body: spec });
+export const dropTable = (c: Connection, db: string, table: string) =>
+  isGo(c) ? go.dropTable(c, table) : call(c, 'dropTable', { params: { db, table } });
+export const tableInfo = (c: Connection, db: string, table: string): Promise<ApiResult<GoTableInfo | unknown>> =>
+  isGo(c) ? go.goTable(c, table) : call(c, 'tableInfo', { params: { db, table } });
 export const rowCount = (c: Connection, db: string, table: string) =>
-  call<{ count?: number }>(c, 'rowCount', { params: { db, table } });
+  isGo(c) ? go.rowCount(c, table) : call<{ count?: number }>(c, 'rowCount', { params: { db, table } });
 export const addIndex = (c: Connection, db: string, table: string, spec: IndexSpec) =>
-  call(c, 'addIndex', { params: { db, table }, body: spec });
+  isGo(c) ? go.addIndex(c, table, spec) : call(c, 'addIndex', { params: { db, table }, body: spec });
 export const dropIndex = (c: Connection, db: string, table: string, index: string) =>
-  call(c, 'dropIndex', { params: { db, table, index } });
+  isGo(c) ? go.dropIndex(c, index) : call(c, 'dropIndex', { params: { db, table, index } });
+/** Insert (REST: put by _pk; Go: INSERT with the object's keys as columns). */
 export const putDoc = (c: Connection, db: string, table: string, doc: unknown) =>
-  call(c, 'putDoc', { params: { db, table }, body: doc });
-export const getDoc = (c: Connection, db: string, table: string, key: string) =>
-  call(c, 'getDoc', { params: { db, table, key } });
-export const delDoc = (c: Connection, db: string, table: string, key: string) =>
-  call(c, 'delDoc', { params: { db, table, key } });
+  isGo(c) ? go.insertRow(c, table, doc as Record<string, unknown>) : call(c, 'putDoc', { params: { db, table }, body: doc });
+export const getDoc = (c: Connection, db: string, table: string, key: string, pk: string[] = []) =>
+  isGo(c) ? go.getRow(c, table, pk, key) : call(c, 'getDoc', { params: { db, table, key } });
+export const delDoc = (c: Connection, db: string, table: string, key: string, pk: string[] = []) =>
+  isGo(c) ? go.deleteByKey(c, table, pk, key) : call(c, 'delDoc', { params: { db, table, key } });
 export const scanDocs = (c: Connection, db: string, table: string, body: Record<string, unknown>) =>
   call(c, 'scanDocs', { params: { db, table }, body });
 export const sql = (c: Connection, db: string, statement: string) =>
-  call(c, 'query', { params: { db }, body: { sql: statement } });
+  isGo(c) ? go.goQuery(c, statement) : call(c, 'query', { params: { db }, body: { sql: statement } });
+export const serverStats = (c: Connection) => (isGo(c) ? go.goStats(c) : call(c, 'serverStats'));
+/** Connection test: Go health + tables, REST table list. */
+export const ping = (c: Connection, db: string) => (isGo(c) ? go.goTables(c) : listTables(c, db));
 
 /** Rows from a query/scan response, whatever wrapper BangDB used. */
 export function extractRows(data: unknown): Record<string, unknown>[] {
+  if (data && typeof data === 'object' && Array.isArray((data as { columns?: unknown }).columns) && Array.isArray((data as { rows?: unknown }).rows)) {
+    return go.goRows(data);
+  }
   if (Array.isArray(data)) return data.filter((r) => r && typeof r === 'object') as Record<string, unknown>[];
   if (!data || typeof data !== 'object') return [];
   const d = data as Record<string, unknown>;

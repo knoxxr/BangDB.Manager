@@ -10,15 +10,20 @@ BangDB 서버의 데이터베이스·테이블을 생성/조회/삭제하고, �
 | Android / iOS 네이티브 앱 | Capacitor 로 래핑 (`npm run cap:android` / `npm run cap:ios`) |
 | 서버 배포 | `Dockerfile` (정적 파일 + CORS 프록시) |
 
-BangDB 2.0 REST API(기본 포트 **18080**)만 사용하므로 서버 쪽 추가 설치가 필요 없습니다.
+두 종류의 BangDB 를 지원합니다.
+
+| 서버 종류 | 연결 방법 | 포트 |
+|---|---|---|
+| **BangDB (Go)** — [knoxxr/bangdb](https://github.com/knoxxr/bangdb) | `bangdb -http :18081 -password <pw> app.db` 로 JSON HTTP API 를 켬 (`http-api` 브랜치 이상). CORS 를 지원하므로 브라우저에서 프록시 없이 직접 연결됩니다. | 18081 |
+| **BangDB 2.0 REST** — bangdb.com | 서버의 REST API 를 그대로 사용 | 18080 |
 
 ## 기능
 
-- 서버 연결 여러 개 저장 (이름, URL, 기본 DB, 인증 방식: 없음 / API 키 헤더 / 로그인 토큰 / HTTP Basic)
+- 서버 연결 여러 개 저장 (종류: BangDB (Go) / BangDB 2.0 REST, URL, 인증: 비밀번호(Basic) / API 키 헤더 / 로그인 토큰 / 없음)
 - 연결 테스트
 - 데이터베이스: 생성(`createDb`), DROP, 기존 DB 등록, 테이블 수 확인
-- 테이블: 목록(시스템 테이블 숨김/표시, 검색), 생성(WIDE/NORMAL, 키 유형/크기, 중복·역인덱스·버전 옵션), 삭제
-- 테이블 상세: 행 수, SQL 기반 데이터 조회(테이블/JSON 보기), 행 터치 → 문서 수정/삭제, JSON·CSV 내보내기, JSON/JSONL 대량 가져오기(진행률, 오류 시 중단), 문서 입력(`_pk`), 키 조회/삭제, 인덱스 추가/삭제, 테이블 정보
+- 테이블: 목록(검색), 생성 — Go: 컬럼 빌더(타입/PK/NOT NULL/UNIQUE/DEFAULT) 또는 SQL 직접 편집, REST: WIDE/NORMAL·키 옵션 — , 삭제
+- 테이블 상세: 행 수, SQL 기반 데이터 조회(테이블/JSON 보기), 행 터치 → 수정/삭제(Go: 기본 키 기준 UPDATE/DELETE), JSON·CSV 내보내기, JSON/JSONL 대량 가져오기(진행률, 오류 시 중단), 행/문서 입력, 키 조회/삭제, 인덱스 추가/삭제(Go: CREATE/DROP INDEX, 기존 인덱스 목록), 테이블 정보(Go: 컬럼·PK·정의 SQL)
 - 서버 상태 조회(`serverStats`)
 - SQL 콘솔 (히스토리, Ctrl+Enter)
 - REST 콘솔 (임의 메서드/경로/본문 + 최근 요청 기록)
@@ -72,7 +77,15 @@ npm run cap:ios         # ios/ 생성 후 Xcode 로 열기 (macOS): npx cap open
 이후 UI 를 수정했으면 `npm run build && npx cap sync` 로 반영합니다.
 앱 ID는 `capacitor.config.ts` 의 `appId` 에서 바꿀 수 있습니다.
 
-## REST 엔드포인트와 검증 상태
+## BangDB (Go) 연결
+
+knoxxr/bangdb 의 `httpapi` 패키지가 제공하는 엔드포인트를 사용합니다: `GET /v1/health`, `GET /v1/tables`, `GET /v1/tables/{name}`, `POST /v1/query`, `GET /v1/stats`. 모든 작업은 SQL 로 수행되며(`src/api/goapi.ts`), 행 수정·삭제는 테이블의 기본 키를 사용합니다(기본 키가 없으면 SQL 콘솔 사용).
+
+```bash
+bangdb -http 0.0.0.0:18081 -password s3cret app.db     # 스마트폰에서 접속하려면 0.0.0.0 으로 바인딩
+```
+
+## BangDB 2.0 REST 엔드포인트와 검증 상태
 
 `src/api/endpoints.ts` 에 모든 템플릿이 있습니다. BangDB 공식 문서로 확인된 항목은 `verified: true` 입니다.
 
@@ -114,7 +127,7 @@ node e2e/smoke.mjs ./shots   # Playwright 스모크 (모의 서버 + 프록시 �
 ## 구조
 
 ```
-src/api/        endpoints.ts(템플릿) · http.ts(fetch/CapacitorHttp 래퍼) · bangdb.ts(클라이언트)
+src/api/        endpoints.ts(템플릿) · http.ts(fetch/CapacitorHttp 래퍼) · bangdb.ts(종류별 분기) · goapi.ts(BangDB Go 어댑터)
 src/store/      연결 목록·요청 기록 (localStorage)
 src/pages/      서버 / DB / 테이블 / 테이블 상세 / SQL / REST 콘솔 / 정보
 src/components/ 레이아웃(하단 탭·사이드바), 모달, 토스트, 데이터 테이블
