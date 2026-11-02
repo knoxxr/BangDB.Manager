@@ -19,7 +19,7 @@ export default function ConnectionsPage() {
   const toast = useToast();
   const { confirm, confirmEl } = useConfirm();
 
-  const blank = (): Connection => normalize({ id: newId(), name: '', kind: 'go', baseUrl: 'http://192.168.0.10:18081', auth: { mode: 'basic', headerName: 'x-bang-api-key', tokenField: 'token' } });
+  const blank = (): Connection => ({ ...normalize({ id: newId(), name: '', kind: 'go', baseUrl: 'http://192.168.0.10:18081', auth: { mode: 'basic', headerName: 'x-bang-api-key', tokenField: 'token' } }), name: '' });
 
   const [status, setStatus] = useState<Record<string, 'ok' | 'err' | 'pending'>>({});
   useEffect(() => {
