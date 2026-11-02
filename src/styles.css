@@ -222,7 +222,7 @@ details.adv[open] summary::before { transform: rotate(45deg); }
 .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .toolbar input.filter { flex: 1 1 220px; min-width: 160px; }
-.pager { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); }
+.pager { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
 .stat { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; box-shadow: var(--shadow-1); }
 .stat .k { font-size: 11.5px; color: var(--muted); font-weight: 500; }
