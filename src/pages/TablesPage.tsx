@@ -4,6 +4,7 @@ import { createTable, dropTable, extractTables, isSystemTable, listTables } from
 import type { ApiResult, ColumnInfo, CreateTableSpec, KeyType, TableType } from '../api/types';
 import { createTableSql } from '../api/goapi';
 import { TopBar } from '../components/Layout';
+import { Icons } from '../components/kinds';
 import { Field, Modal, ResultBadge, describeResult, useConfirm, useToast } from '../components/ui';
 import { useConnection } from '../store/store';
 
@@ -48,7 +49,7 @@ export default function TablesPage() {
       <div className="row wrap" style={{ marginBottom: 10 }}>
         <input className="grow mono" placeholder="테이블 검색" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg)' }} />
         <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={showSys} onChange={(e) => setShowSys(e.target.checked)} /> 시스템 테이블</label>
-        <button className="btn sm" onClick={load} disabled={loading}>{loading ? '…' : '새로고침'}</button>
+        <button className="btn ghost icon sm" onClick={load} disabled={loading} title="새로고침" aria-label="새로고침">{loading ? <span className="spin" /> : Icons.refresh}</button>
         <ResultBadge r={res} />
       </div>
       {res && !res.ok && <div className="card danger">{describeResult(res)}</div>}
@@ -60,7 +61,7 @@ export default function TablesPage() {
               <div className="title mono">{t}</div>
               {isSystemTable(t) && <div className="sub">시스템 테이블</div>}
             </div>
-            <button className="btn sm danger" onClick={() => drop(t)}>삭제</button>
+            <button className="btn ghost icon sm danger" onClick={() => drop(t)} title="삭제" aria-label="삭제">{Icons.trash}</button>
           </div>
         ))}
       </div>

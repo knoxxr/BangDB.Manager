@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { countWhere, dropTable, dropView, errorText, goQuery, goRows, goTables } from '../api/goapi';
 import type { GoTableInfo } from '../api/types';
 import { TopBar } from '../components/Layout';
+import { Icons } from '../components/kinds';
 import { CreateTableModal, CreateViewModal } from '../components/SchemaForms';
 import { DataTable, Modal, useConfirm, useToast } from '../components/ui';
 import { useDbConnection } from '../store/store';
@@ -71,7 +72,7 @@ export default function GoTablesPage() {
       <div className="toolbar">
         <input className="inp filter" placeholder="테이블·뷰 검색" value={filter} onChange={(e) => setFilter(e.target.value)} />
         <span className="muted small">테이블 {nT} · 뷰 {tables.length - nT}</span>
-        <button className="btn sm" onClick={load} disabled={loading}>{loading ? '…' : '새로고침'}</button>
+        <button className="btn ghost icon sm" onClick={load} disabled={loading} title="새로고침" aria-label="새로고침">{loading ? <span className="spin" /> : Icons.refresh}</button>
       </div>
       {err && <div className="card danger">{err}</div>}
       {!err && !loading && tables.length === 0 && (
@@ -97,7 +98,8 @@ export default function GoTablesPage() {
                   : `컬럼 ${t.columns?.length ?? 0} · 인덱스 ${(t.indexes ?? []).filter((i) => !i.auto).length} · ${counts[t.name] === undefined ? '…' : `${counts[t.name]!.toLocaleString()}행`} — ${(t.columns ?? []).map((c) => c.name).join(', ')}`}
               </div>
             </div>
-            <button className="btn sm danger" onClick={() => drop(t)}>삭제</button>
+            <button className="btn ghost icon sm danger" onClick={() => drop(t)} title="삭제" aria-label="삭제">{Icons.trash}</button>
+            <span className="chev" onClick={() => nav(`${base}/t/${encodeURIComponent(t.name)}`)}>{Icons.chevron}</span>
           </div>
         ))}
       </div>

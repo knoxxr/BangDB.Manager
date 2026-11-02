@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { extractTables, extractToken, login, ping } from '../api/bangdb';
 import { Capacitor } from '@capacitor/core';
@@ -7,7 +7,8 @@ import { gw, gwSqliteFiles } from '../api/gateway';
 import { DEFAULT_ENDPOINTS, GO_KEYS, REST_KEYS } from '../api/endpoints';
 import type { AuthMode, Connection, DbParams, EndpointDef, EndpointKey, HttpMethod, ServerKind } from '../api/types';
 import { TopBar } from '../components/Layout';
-import { Field, Modal, describeResult, useConfirm, useToast } from '../components/ui';
+import { EmptyState, Field, Modal, describeResult, useConfirm, useToast } from '../components/ui';
+import { Icons, KindBadge } from '../components/kinds';
 import { isGatewayKind, newId, normalize, store, useStore } from '../store/store';
 import { isElectron } from '../platform';
 
@@ -20,25 +21,58 @@ export default function ConnectionsPage() {
 
   const blank = (): Connection => normalize({ id: newId(), name: '', kind: 'go', baseUrl: 'http://192.168.0.10:18081', auth: { mode: 'basic', headerName: 'x-bang-api-key', tokenField: 'token' } });
 
+  const [status, setStatus] = useState<Record<string, 'ok' | 'err' | 'pending'>>({});
+  useEffect(() => {
+    // one quick health check per saved connection, so the list shows what is reachable
+    let alive = true;
+    const ids = connections.map((c) => c.id).join(',');
+    if (!ids) return;
+    setStatus((s) => Object.fromEntries(connections.map((c) => [c.id, s[c.id] ?? 'pending'])));
+    connections.forEach(async (c) => {
+      const r = c.db || c.kind === 'go' ? await goHealth(c) : await ping(c, c.defaultDb);
+      if (alive) setStatus((s) => ({ ...s, [c.id]: r.ok ? 'ok' : 'err' }));
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections.map((c) => c.id + c.baseUrl + JSON.stringify(c.db ?? null)).join('|')]);
+
   return (
     <>
-      <TopBar title="서버 연결" right={<button className="btn primary" onClick={() => setEditing({ conn: blank(), isNew: true })}>+ 추가</button>} />
+      <TopBar title="서버 연결" right={<button className="btn primary" onClick={() => setEditing({ conn: blank(), isNew: true })}>{Icons.plus}추가</button>} />
       {connections.length === 0 && (
-        <div className="card">
-          <p><b>서버를 등록하세요.</b></p>
-          <p className="muted small"><b>PostgreSQL · MySQL · SQL Server · SQLite · MongoDB · Redis</b> 는 이 앱을 띄운 서버(<code>npm run dev</code> 또는 <code>node proxy/server.mjs</code>)의 DB 게이트웨이를 거쳐 접속합니다. "+ 추가"에서 종류를 고르고 호스트·계정을 입력하세요.</p>
-          <p className="muted small">두 종류의 서버를 지원합니다. <b>BangDB (Go) HTTP API</b>: <code>bangdb -http :18081 -password ...</code> 로 켠 knoxxr/bangdb 서버 (CORS 지원, 프록시 불필요). <b>BangDB 2.0 REST</b>: bangdb.com 서버의 18080 포트. REST 서버는 브라우저에서 CORS 오류가 나면 "프록시 경유"를 켜세요. Android/iOS 앱에서는 프록시 없이 직접 호출됩니다.</p>
-        </div>
+        <>
+          <EmptyState icon={Icons.server} title="아직 등록된 서버가 없습니다"
+            action={<button className="btn primary" onClick={() => setEditing({ conn: blank(), isNew: true })}>{Icons.plus}첫 서버 추가</button>}>
+            종류를 고르고 주소와 계정을 입력하면 테이블, 데이터, SQL 을 이 화면에서 바로 다룰 수 있습니다.
+          </EmptyState>
+          <div className="guide">
+            <div className="g"><b><KindBadge kind="go" small />BangDB (Go)</b>knoxxr/bangdb 를 <code>bangdb -http :18081 -password …</code> 로 실행하면 프록시 없이 바로 연결됩니다.</div>
+            <div className="g"><b><KindBadge kind="postgres" small />PostgreSQL · MySQL · SQL Server · SQLite</b>이 앱을 띄운 서버의 DB 게이트웨이를 거쳐 접속합니다. 데스크톱 앱은 게이트웨이를 내장하고 있습니다.</div>
+            <div className="g"><b><KindBadge kind="mongodb" small />MongoDB · Redis</b>컬렉션·문서와 키 브라우저 전용 화면을 제공합니다. 역시 게이트웨이를 거칩니다.</div>
+            <div className="g"><b><KindBadge kind="rest" small />BangDB 2.0 REST</b>bangdb.com 서버의 18080 포트. 브라우저에서 CORS 오류가 나면 "프록시 경유"를 켜세요.</div>
+          </div>
+        </>
       )}
       <div className="list">
         {connections.map((c) => (
-          <div key={c.id} className="item">
-            <div className="grow" onClick={() => nav(`/c/${c.id}/dbs`)} style={{ cursor: 'pointer' }}>
-              <div className="title">{c.name}</div>
-              <div className="sub">{kindLabel(c.kind)} · {connTarget(c)}{c.kind === 'rest' ? ` · DB ${c.databases.length}개` : ''}{c.db ? '' : ` · 인증 ${authLabel(c.auth.mode)}`}{c.useProxy ? ' · 프록시' : ''}</div>
+          <div key={c.id} className="conn" onClick={() => nav(`/c/${c.id}/dbs`)} role="link" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && nav(`/c/${c.id}/dbs`)}>
+            <KindBadge kind={c.kind} />
+            <div className="meta">
+              <div className="title"><span className={`dot ${status[c.id] ?? ''}`} title={status[c.id] === 'ok' ? '연결됨' : status[c.id] === 'err' ? '연결 안 됨' : '확인 중'} /><span className="name">{c.name}</span></div>
+              <div className="sub">{connTarget(c)}</div>
+              <div className="tags">
+                <span className="badge">{kindLabel(c.kind)}</span>
+                {c.kind === 'rest' && <span className="badge">DB {c.databases.length}개</span>}
+                {!c.db && <span className="badge">{authLabel(c.auth.mode)}</span>}
+                {c.useProxy && <span className="badge accent">프록시</span>}
+                {status[c.id] === 'err' && <span className="badge err">연결 안 됨</span>}
+              </div>
             </div>
-            <button className="btn sm" onClick={() => setEditing({ conn: c, isNew: false })}>편집</button>
-            <button className="btn sm danger" onClick={async () => { if (await confirm(`"${c.name}" 연결을 삭제할까요? (서버 데이터는 삭제되지 않습니다)`)) { store.removeConnection(c.id); toast('연결 삭제됨'); } }}>삭제</button>
+            <div className="acts" onClick={(e) => e.stopPropagation()}>
+              <button className="btn ghost icon sm" title="편집" aria-label="편집" onClick={() => setEditing({ conn: c, isNew: false })}>{Icons.edit}</button>
+              <button className="btn ghost icon sm danger" title="삭제" aria-label="삭제" onClick={async () => { if (await confirm(`"${c.name}" 연결을 삭제할까요? (서버 데이터는 삭제되지 않습니다)`)) { store.removeConnection(c.id); toast('연결 삭제됨'); } }}>{Icons.trash}</button>
+            </div>
+            <span className="chev">{Icons.chevron}</span>
           </div>
         ))}
       </div>
@@ -129,7 +163,7 @@ function ConnectionForm({ initial, isNew, onClose, onSave }: { initial: Connecti
             return;
           }
           const was = isGatewayKind(c.kind) || !c.baseUrl;
-          up({ kind, db: undefined, baseUrl: was ? (kind === 'go' ? 'http://192.168.0.10:18081' : 'http://192.168.0.10:18080') : c.baseUrl.replace(/:1808[01](\/|$)/, kind === 'go' ? ':18081$1' : ':18080$1'), useProxy: kind === 'rest' && isElectron });
+          up({ kind, db: undefined, baseUrl: was ? (kind === 'go' ? 'http://192.168.0.10:18081' : 'http://192.168.0.10:18080') : c.baseUrl.replace(/:1808[01](\/|$)/, kind === 'go' ? ':18081$1' : ':18080$1'), useProxy: kind === 'rest' && isElectron, defaultDb: kind === 'rest' ? (!c.defaultDb || c.defaultDb === 'main' ? 'mydb' : c.defaultDb) : 'main' });
           if (kind === 'go') upAuth({ mode: 'basic' });
         }}>
           <optgroup label="BangDB">

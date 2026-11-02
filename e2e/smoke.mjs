@@ -12,7 +12,8 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 const url = 'http://127.0.0.1:8080/#/connections';
 await page.goto(url);
-await page.getByRole('button', { name: '+ 추가' }).click();
+await page.getByRole('button', { name: '추가', exact: true }).click();
+await page.locator('.modal select').first().selectOption('rest'); // BangDB 2.0 REST (the mock server)
 await page.getByPlaceholder('예: 사내 BangDB').fill('테스트 서버');
 await page.getByPlaceholder('http://192.168.0.10:18080').fill('http://127.0.0.1:18080');
 await page.locator('label.check').filter({ hasText: '프록시 경유' }).click();
@@ -21,7 +22,7 @@ await page.getByText(/연결 성공/).waitFor({ timeout: 5000 });
 console.log('test:', await page.getByText(/연결 성공/).textContent());
 await page.screenshot({ path: `${shots}/01-connection.png` });
 await page.getByRole('button', { name: '저장' }).click();
-await page.locator('.item .title', { hasText: '테스트 서버' }).click();
+await page.locator('.conn .name', { hasText: '테스트 서버' }).click();
 await page.getByRole('button', { name: '새로고침' }).click();
 await page.getByText(/테이블 2개/).waitFor();
 await page.screenshot({ path: `${shots}/02-databases.png` });
@@ -77,7 +78,7 @@ await page.screenshot({ path: `${shots}/06-console.png` });
 // desktop layout check
 const d = await browser.newPage({ viewport: { width: 1280, height: 800 }, storageState: await ctx.storageState() });
 await d.goto('http://127.0.0.1:8080/#/connections');
-await d.locator('.item .title', { hasText: '테스트 서버' }).click();
+await d.locator('.conn .name', { hasText: '테스트 서버' }).click();
 await d.locator('.item .title', { hasText: 'mydb' }).click();
 await d.locator('.item .title', { hasText: 'users' }).waitFor();
 await d.screenshot({ path: `${shots}/07-desktop.png` });

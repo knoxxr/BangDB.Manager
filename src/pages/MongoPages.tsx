@@ -6,6 +6,7 @@ import { downloadText, parseDocuments, toCsv } from '../api/data';
 import { ejsonText, mongo, parseJson, schemaOf, type CollectionInfo, type Doc, type IndexInfo } from '../api/mongo';
 import type { Connection } from '../api/types';
 import { TopBar } from '../components/Layout';
+import { Icons } from '../components/kinds';
 import { DataTable, Field, JsonOut, Modal, useConfirm, usePrompt, useToast } from '../components/ui';
 import { useConnection } from '../store/store';
 import { fmtBytes } from './ConnectionsPage';
@@ -44,7 +45,7 @@ export function MongoServerPage({ conn }: { conn: Connection }) {
 
   return (
     <>
-      <TopBar title={conn.name} crumbs={[{ to: '/connections', label: '서버' }, { label: 'MongoDB' }]} right={<button className="btn sm" onClick={load}>새로고침</button>} />
+      <TopBar title={conn.name} crumbs={[{ to: '/connections', label: '서버' }, { label: 'MongoDB' }]} right={<button className="btn ghost icon sm" onClick={load} title="새로고침" aria-label="새로고침">{Icons.refresh}</button>} />
       {err && <div className="card danger">{err}</div>}
       <div className="stats">
         {tiles.map(([k, v]) => <div key={k} className="stat"><div className="k">{k}</div><div className="v" style={{ fontSize: 15 }}>{v === undefined ? '…' : typeof v === 'number' ? v.toLocaleString() : String(ejsonText(v))}</div></div>)}
@@ -116,7 +117,7 @@ export function MongoDbPage() {
         right={<button className="btn primary sm" onClick={() => setCreating(true)}>+ 컬렉션</button>} />
       <div className="toolbar">
         <input className="inp filter" placeholder="컬렉션 검색" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <button className="btn sm" onClick={load}>새로고침</button>
+        <button className="btn ghost icon sm" onClick={load} title="새로고침" aria-label="새로고침">{Icons.refresh}</button>
       </div>
       {err && <div className="card danger">{err}</div>}
       {cols && !cols.length && <div className="empty">컬렉션이 없습니다.</div>}

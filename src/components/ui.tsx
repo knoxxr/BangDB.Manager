@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { ApiResult } from '../api/types';
+import { Icons } from './kinds';
 
 // ---------- Toasts ----------
-interface Toast { id: number; text: string; kind: 'info' | 'ok' | 'err' }
+interface Toast { id: number; text: string; kind: 'info' | 'ok' | 'err'; n: number }
 const ToastCtx = createContext<(text: string, kind?: Toast['kind']) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
 
@@ -10,15 +11,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Toast[]>([]);
   const push = useCallback((text: string, kind: Toast['kind'] = 'info') => {
     const id = Date.now() + Math.random();
-    setItems((l) => [...l, { id, text, kind }]);
-    setTimeout(() => setItems((l) => l.filter((t) => t.id !== id)), kind === 'err' ? 6000 : 3000);
+    setItems((l) => {
+      // repeat of the newest toast: bump its counter instead of stacking
+      const last = l[l.length - 1];
+      if (last && last.text === text && last.kind === kind) return [...l.slice(0, -1), { ...last, n: last.n + 1 }];
+      return [...l.slice(-3), { id, text, kind, n: 1 }];
+    });
+    setTimeout(() => setItems((l) => l.filter((t) => t.id !== id)), kind === 'err' ? 6000 : 2800);
   }, []);
   return (
     <ToastCtx.Provider value={push}>
       {children}
       <div className="toasts">
         {items.map((t) => (
-          <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>
+          <div key={t.id} className={`toast ${t.kind}`} role="status">{t.kind === 'ok' ? Icons.check : t.kind === 'err' ? Icons.alert : Icons.info}<span className="grow">{t.text}</span>{t.n > 1 && <span className="n">×{t.n}</span>}</div>
         ))}
       </div>
     </ToastCtx.Provider>
@@ -47,7 +53,8 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
   }, [onClose]);
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className={`modal${wide ? ' wide' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <div className={`modal${wide ? ' wide' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
+        <button className="x" onClick={onClose} aria-label="닫기">{Icons.close}</button>
         <h2>{title}</h2>
         {children}
       </div>
@@ -134,3 +141,15 @@ export function DataTable({ rows, onRowClick }: { rows: Record<string, unknown>[
   );
 }
 const fmt = (v: unknown) => (v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+
+/** Friendly empty state with an optional action. */
+export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="empty-state">
+      <div className="ico">{icon ?? Icons.db}</div>
+      <h3>{title}</h3>
+      {children && <p>{children}</p>}
+      {action}
+    </div>
+  );
+}

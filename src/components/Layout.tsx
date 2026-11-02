@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useParams } from 'react-router-dom';
 import { useStore } from '../store/store';
+import { Icons, KindBadge, KIND_STYLE } from './kinds';
 
 const I = {
   server: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg>,
@@ -28,13 +29,18 @@ export default function Layout() {
   ];
   const nav = (cls: string) => (
     <nav className={cls}>
-      {cls === 'sidenav' && <div className="brand">BangDB Manager</div>}
+      {cls === 'sidenav' && <div className="brand"><span className="mark">{Icons.logo}</span>BangDB Manager</div>}
       {links.map((l) => (
         <NavLink key={l.label} to={l.to} end={!!l.end} className={({ isActive }) => (isActive && !l.disabled ? 'active' : '')} style={l.disabled ? { opacity: 0.4 } : undefined}>
           {l.icon}<span>{l.label}</span>
         </NavLink>
       ))}
-      {cls === 'sidenav' && active && <div className="muted small" style={{ marginTop: 'auto', padding: 10 }}>현재 서버: {active.name}</div>}
+      {cls === 'sidenav' && active && (
+        <NavLink to="/connections" className="cur" title="서버 바꾸기">
+          <KindBadge kind={active.kind} small />
+          <span className="t"><b>{active.name}</b><span>{KIND_STYLE[active.kind]?.label ?? active.kind} · 바꾸려면 클릭</span></span>
+        </NavLink>
+      )}
     </nav>
   );
   return (
