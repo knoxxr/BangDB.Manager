@@ -67,6 +67,17 @@ node scripts/mock-bangdb.mjs          # 18080 포트에 모의 BangDB
 
 소스에서 만들려면: `npm run build && npm ci --omit=dev --prefix proxy && npm run desktop:linux` (또는 `desktop:win`, `desktop:mac`, 각 OS 에서 실행). 결과는 `release/` 에 생깁니다. 개발 중 실행은 `npm run build && npm run electron`.
 
+## 자동 업데이트
+
+| 환경 | 동작 |
+|---|---|
+| Windows 설치판, Linux AppImage | 시작 8초 후와 4시간마다 GitHub 릴리즈를 확인해 새 버전을 내려받고, 재시작할 때(또는 "지금 재시작") 설치합니다. 메뉴 **도움말 → 업데이트 확인** 으로 바로 확인할 수 있습니다. |
+| macOS dmg, Linux deb | 서명이 없어 자동 설치가 되지 않으므로 새 버전이 있으면 알림을 띄우고 다운로드 페이지를 엽니다("이 버전 건너뛰기" 가능). |
+| 웹 / PWA | 서비스 워커가 한 시간마다, 그리고 앱이 다시 보일 때 새 빌드를 확인하고 "새 버전이 준비되었습니다 — 새로고침" 바를 띄웁니다. |
+| Android APK | 하루 한 번 GitHub 최신 릴리즈를 확인하고 새 버전이면 APK 다운로드 바를 띄웁니다. |
+
+끄려면 데스크톱은 `BANGDB_MANAGER_NO_UPDATE=1` 로 실행합니다. 릴리즈 워크플로가 `latest.yml` / `latest-linux.yml` 과 블록맵을 함께 올리므로, 릴리즈를 만들면 설치된 앱이 알아서 따라옵니다 (v0.4.0 이후 설치본부터).
+
 ## 배포 (웹/PWA)
 
 ```bash

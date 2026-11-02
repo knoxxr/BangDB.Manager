@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ToastProvider } from './components/ui';
+import UpdateBanner from './components/UpdateBanner';
 import AboutPage from './pages/AboutPage';
 import ConnectionsPage from './pages/ConnectionsPage';
 import ConsolePage from './pages/ConsolePage';
@@ -44,6 +45,7 @@ function ServerPage() {
 export default function App() {
   return (
     <ToastProvider>
+      <UpdateBanner />
       <HashRouter>
         <Routes>
           <Route element={<Layout />}>

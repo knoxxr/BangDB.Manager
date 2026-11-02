@@ -107,6 +107,8 @@ jobs:
           body_path: CHANGELOG.md
           files: |
             release/*.exe
+            release/*.exe.blockmap
             release/*.AppImage
             release/*.deb
             release/*.dmg
+            release/latest*.yml

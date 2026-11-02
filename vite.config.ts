@@ -30,7 +30,7 @@ export default defineConfig({
     gateway,
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'BangDB Manager',

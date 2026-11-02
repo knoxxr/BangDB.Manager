@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { createProxyServer, listen } from '../proxy/lib.mjs';
+import { check as checkUpdates, initUpdater, statusLabel } from './updater.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = join(here, '..', 'dist');
@@ -107,7 +108,14 @@ function buildMenu() {
       ]
     },
     { label: '보기', submenu: [{ role: 'reload', label: '새로고침' }, { role: 'toggleDevTools', label: '개발자 도구' }, { type: 'separator' }, { role: 'resetZoom', label: '원래 크기' }, { role: 'zoomIn', label: '확대' }, { role: 'zoomOut', label: '축소' }, { type: 'separator' }, { role: 'togglefullscreen', label: '전체 화면' }] },
-    { label: '도움말', submenu: [{ label: 'GitHub 저장소', click: () => shell.openExternal('https://github.com/knoxxr/BangDB.Manager') }, { label: `버전 ${app.getVersion()}`, enabled: false }] }
+    { label: '도움말', submenu: [
+      { label: '업데이트 확인', click: () => checkUpdates(true) },
+      { label: statusLabel(), enabled: false },
+      { type: 'separator' },
+      { label: 'GitHub 저장소', click: () => shell.openExternal('https://github.com/knoxxr/BangDB.Manager') },
+      { label: '릴리즈 노트', click: () => shell.openExternal('https://github.com/knoxxr/BangDB.Manager/releases') },
+      { label: `버전 ${app.getVersion()}`, enabled: false }
+    ] }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -135,6 +143,7 @@ app.whenReady().then(async () => {
   }
   buildMenu();
   createWindow();
+  initUpdater({ getWindow: () => win, onState: () => buildMenu() });
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

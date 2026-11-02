@@ -356,3 +356,11 @@ table.grid td.lead input { vertical-align: middle; }
 .guide .g { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; font-size: 13px; color: var(--text2); }
 .guide .g b { display: flex; align-items: center; gap: 8px; color: var(--text); margin-bottom: 6px; font-size: 14px; }
 .guide .g code { display: inline-block; margin-top: 4px; }
+
+/* ==========================================================================
+   update bar (new build / new release)
+   ========================================================================== */
+.updatebar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 12px + var(--safe-b)); z-index: 55; display: flex; align-items: center; gap: 8px; width: min(94vw, 520px); padding: 10px 12px; border-radius: 14px; background: var(--bg3); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: var(--shadow-2); font-size: 13px; animation: toast-in .25s cubic-bezier(.2,.8,.2,1); }
+.updatebar > svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; }
+.updatebar .btn { text-decoration: none; }
+@media (min-width: 900px) { .updatebar { bottom: 22px; left: auto; right: 22px; transform: none; } }
