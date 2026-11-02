@@ -61,7 +61,7 @@ describe('grid SQL', () => {
   it('typed input', () => {
     expect(parseInput('42', { name: 'a', type: 'INTEGER' })).toBe(42);
     expect(parseInput('', { name: 'a', type: 'INTEGER' })).toBeNull();
-    expect(() => parseInput('4.2', { name: 'a', type: 'INTEGER' })).toThrow(/정수/);
+    expect(() => parseInput('4.2', { name: 'a', type: 'INTEGER' })).toThrow(/integer/);
     expect(parseInput('9007199254740993', { name: 'a', type: 'INTEGER' })).toBe('9007199254740993');
     expect(parseInput('1.5', { name: 'r', decl: 'DOUBLE' })).toBe(1.5);
     expect(parseInput(' 007 ', { name: 's', type: 'TEXT' })).toBe(' 007 ');

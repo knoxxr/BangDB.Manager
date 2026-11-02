@@ -26,7 +26,7 @@ type Pages = Partial<Record<ServerKind | 'sql', React.ReactNode>>;
  */
 function ByKind(p: Pages) {
   const conn = useConnection(useParams().connId);
-  if (!conn) return <div className="empty">연결을 찾을 수 없습니다. <a href="#/connections">서버 목록</a></div>;
+  if (!conn) return <div className="empty">Connection not found. <a href="#/connections">Server list</a></div>;
   const sql = ['go', 'postgres', 'mysql', 'mssql', 'sqlite'].includes(conn.kind);
   return <>{p[conn.kind] ?? (sql ? p.sql : undefined) ?? p.rest}</>;
 }

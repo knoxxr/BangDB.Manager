@@ -18,7 +18,7 @@ export default function DatabasesPage() {
   const [counts, setCounts] = useState<Record<string, number | 'err'>>({});
   const [stats, setStats] = useState<ApiResult | null | 'loading'>(null);
 
-  if (!conn) return <div className="empty">연결을 찾을 수 없습니다. <a href="#/connections">서버 목록</a></div>;
+  if (!conn) return <div className="empty">Connection not found. <a href="#/connections">Server list</a></div>;
 
   async function refresh() {
     if (!conn) return;
@@ -37,8 +37,8 @@ export default function DatabasesPage() {
     try {
       if (adding === 'create') {
         const r = await createDb(conn, db);
-        if (!r.ok) { toast(`DB 생성 실패: ${describeResult(r)}`, 'err'); return; }
-        toast(`DB "${db}" 생성됨`, 'ok');
+        if (!r.ok) { toast(`Failed to create DB: ${describeResult(r)}`, 'err'); return; }
+        toast(`DB "${db}" created`, 'ok');
       }
       store.addDatabase(conn.id, db);
       setAdding(null); setName('');
@@ -47,50 +47,50 @@ export default function DatabasesPage() {
 
   async function drop(db: string) {
     if (!conn) return;
-    if (!(await confirm(`DB "${db}" 를 서버에서 삭제(DROP)합니다. 모든 테이블과 데이터가 사라집니다. 계속할까요?`))) return;
+    if (!(await confirm(`This will DROP database "${db}" on the server. All tables and data will be lost. Continue?`))) return;
     const r = await dropDb(conn, db);
-    if (!r.ok) { toast(`삭제 실패: ${describeResult(r)}`, 'err'); return; }
+    if (!r.ok) { toast(`Delete failed: ${describeResult(r)}`, 'err'); return; }
     store.removeDatabase(conn.id, db);
-    toast(`DB "${db}" 삭제됨`, 'ok');
+    toast(`DB "${db}" deleted`, 'ok');
   }
 
   return (
     <>
-      <TopBar title="데이터베이스" crumbs={[{ to: '/connections', label: '서버' }, { label: conn.name }]}
-        right={<><button className="btn sm ghost" onClick={async () => { setStats('loading'); setStats(await serverStats(conn)); }}>서버 상태</button><button className="btn sm" onClick={refresh}>새로고침</button>{conn.kind === 'rest' && <button className="btn primary sm" onClick={() => setAdding('create')}>+ 생성</button>}</>} />
+      <TopBar title="Databases" crumbs={[{ to: '/connections', label: 'Servers' }, { label: conn.name }]}
+        right={<><button className="btn sm ghost" onClick={async () => { setStats('loading'); setStats(await serverStats(conn)); }}>Server stats</button><button className="btn sm" onClick={refresh}>Refresh</button>{conn.kind === 'rest' && <button className="btn primary sm" onClick={() => setAdding('create')}>+ Create</button>}</>} />
       {conn.kind === 'go'
-        ? <p className="muted small">BangDB (Go) 서버는 파일 하나를 서비스합니다. 아래 항목을 열어 테이블을 관리하세요.</p>
-        : <p className="muted small">BangDB 서버는 보통 bangdb.config 의 DB 하나를 서비스합니다. 목록은 이 앱에 등록된 DB 이름이며, "등록"은 서버에 이미 있는 DB를 목록에만 추가합니다.</p>}
+        ? <p className="muted small">A BangDB (Go) server serves a single file. Open the item below to manage its tables.</p>
+        : <p className="muted small">A BangDB server usually serves the single DB set in bangdb.config. This list holds the DB names registered in this app; "Register" only adds a DB that already exists on the server to the list.</p>}
       <div className="list">
         {conn.databases.map((db) => (
           <div key={db} className="item">
             <div className="grow" style={{ cursor: 'pointer' }} onClick={() => nav(`/c/${conn.id}/db/${encodeURIComponent(db)}`)}>
-              <div className="title">{db}{db === conn.defaultDb && <span className="badge" style={{ marginLeft: 8 }}>기본</span>}</div>
-              <div className="sub">{counts[db] === undefined ? '테이블 수: 새로고침으로 확인' : counts[db] === 'err' ? <span className="danger">조회 실패</span> : `테이블 ${counts[db]}개`}</div>
+              <div className="title">{db}{db === conn.defaultDb && <span className="badge" style={{ marginLeft: 8 }}>Default</span>}</div>
+              <div className="sub">{counts[db] === undefined ? 'Table count: press Refresh' : counts[db] === 'err' ? <span className="danger">Load failed</span> : `${counts[db]} table(s)`}</div>
             </div>
             <button className="btn sm" onClick={() => nav(`/c/${conn.id}/db/${encodeURIComponent(db)}/query`)}>SQL</button>
-            {conn.kind === 'rest' && <button className="btn sm ghost" title="목록에서만 제거" onClick={() => store.removeDatabase(conn.id, db)}>숨김</button>}
+            {conn.kind === 'rest' && <button className="btn sm ghost" title="Remove from the list only" onClick={() => store.removeDatabase(conn.id, db)}>Hide</button>}
             {conn.kind === 'rest' && <button className="btn sm danger" onClick={() => drop(db)}>DROP</button>}
           </div>
         ))}
       </div>
-      {conn.kind === 'rest' && <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setAdding('register')}>기존 DB 이름 등록</button>}
-      {conn.kind === 'rest' && <button className="fab" onClick={() => setAdding('create')} aria-label="DB 생성">+</button>}
+      {conn.kind === 'rest' && <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setAdding('register')}>Register existing DB name</button>}
+      {conn.kind === 'rest' && <button className="fab" onClick={() => setAdding('create')} aria-label="Create DB">+</button>}
       {adding && (
-        <Modal title={adding === 'create' ? 'DB 생성' : '기존 DB 등록'} onClose={() => setAdding(null)}>
-          <Field label="DB 이름"><input className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></Field>
-          {adding === 'create' && <p className="muted small">createDb 엔드포인트(기본 PUT /db/{'{db}'})를 호출합니다. 서버가 지원하지 않으면 실패 메시지가 표시되며, 이 경우 "기존 DB 등록"을 사용하세요.</p>}
+        <Modal title={adding === 'create' ? 'Create DB' : 'Register existing DB'} onClose={() => setAdding(null)}>
+          <Field label="DB name"><input className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></Field>
+          {adding === 'create' && <p className="muted small">Calls the createDb endpoint (default PUT /db/{'{db}'}). If the server does not support it, an error is shown; use "Register existing DB" instead.</p>}
           <div className="actions">
-            <button className="btn" onClick={() => setAdding(null)}>취소</button>
-            <button className="btn primary" disabled={busy || !name.trim()} onClick={submit}>{adding === 'create' ? '생성' : '등록'}</button>
+            <button className="btn" onClick={() => setAdding(null)}>Cancel</button>
+            <button className="btn primary" disabled={busy || !name.trim()} onClick={submit}>{adding === 'create' ? 'Create' : 'Register'}</button>
           </div>
         </Modal>
       )}
       {stats && (
-        <Modal title="서버 상태" onClose={() => setStats(null)}>
-          {stats === 'loading' ? <p className="muted">조회 중…</p> : (
+        <Modal title="Server stats" onClose={() => setStats(null)}>
+          {stats === 'loading' ? <p className="muted">Loading…</p> : (
             <>
-              <div className="row" style={{ marginBottom: 8 }}><ResultBadge r={stats} /><span className="muted small">{conn.kind === 'go' ? 'GET /v1/stats' : 'GET serverStats (추정 경로)'}</span></div>
+              <div className="row" style={{ marginBottom: 8 }}><ResultBadge r={stats} /><span className="muted small">{conn.kind === 'go' ? 'GET /v1/stats' : 'GET serverStats (assumed path)'}</span></div>
               {!stats.ok && <p className="danger small">{describeResult(stats)}</p>}
               <JsonOut value={stats.data ?? ''} />
             </>

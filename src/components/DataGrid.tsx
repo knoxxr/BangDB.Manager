@@ -60,11 +60,11 @@ export function DataGrid(p: GridProps) {
         <thead>
           <tr>
             <th className="lead">
-              {!p.readOnly && <input type="checkbox" checked={allSel} onChange={p.onToggleAll} aria-label="전체 선택" />}
+              {!p.readOnly && <input type="checkbox" checked={allSel} onChange={p.onToggleAll} aria-label="Select all" />}
             </th>
             {p.columns.map((c) => (
               <th key={c.name} className={p.onSort ? 'sortable' : ''} onClick={() => p.onSort?.(c.name)} title={c.decl || c.type || ''}>
-                {c.pk && <span className="pk-ico" title="기본 키">🔑</span>}
+                {c.pk && <span className="pk-ico" title="Primary key">🔑</span>}
                 {c.name}
                 {p.sort?.col === c.name && <span>{p.sort.desc ? ' ▼' : ' ▲'}</span>}
                 <span className="ctype">{[c.decl || c.type || 'ANY', c.notNull ? 'NOT NULL' : '', c.default ? `= ${c.default}` : ''].filter(Boolean).join(' · ')}</span>
@@ -80,8 +80,8 @@ export function DataGrid(p: GridProps) {
             return (
               <tr key={r.key} className={[r.isNew ? 'new' : '', del ? 'deleted' : '', sel ? 'sel' : ''].join(' ')}>
                 <td className="lead">
-                  {!p.readOnly && <input type="checkbox" checked={sel} onChange={() => p.onToggleSelect(r.key)} aria-label="행 선택" />}
-                  <button className="rowbtn" title={p.readOnly ? '자세히' : '폼으로 편집'} onClick={() => p.onOpenRow(r)}>{p.readOnly ? '⤢' : '✎'}</button>
+                  {!p.readOnly && <input type="checkbox" checked={sel} onChange={() => p.onToggleSelect(r.key)} aria-label="Select row" />}
+                  <button className="rowbtn" title={p.readOnly ? 'Details' : 'Edit in form'} onClick={() => p.onOpenRow(r)}>{p.readOnly ? '⤢' : '✎'}</button>
                 </td>
                 {p.columns.map((c) => {
                   const has = c.name in e;
@@ -102,7 +102,7 @@ export function DataGrid(p: GridProps) {
                       </td>
                     );
                   }
-                  const placeholder = r.isNew && !has ? (c.pk && a === 'INTEGER' ? '(자동)' : c.default ? `기본값 ${c.default}` : '') : '';
+                  const placeholder = r.isNew && !has ? (c.pk && a === 'INTEGER' ? '(auto)' : c.default ? `default ${c.default}` : '') : '';
                   return (
                     <td key={c.name} className={cls} title={cellText(v)}
                       onClick={() => { if (editable(c) && !del) setEditing({ row: r.key, col: c.name }); }}>
@@ -115,7 +115,7 @@ export function DataGrid(p: GridProps) {
           })}
         </tbody>
       </table>
-      {!p.rows.length && <div className="empty">행이 없습니다</div>}
+      {!p.rows.length && <div className="empty">No rows</div>}
     </div>
   );
 }
@@ -158,7 +158,7 @@ function CellEditor({ col, value, onCommit, onCancel, onError }: {
         onChange={(e) => { setIsNull(false); setText(e.target.value); }}
         onKeyDown={onKey} onBlur={() => commit()} />
       {!col.notNull && !col.pk && (
-        <button type="button" className="btn sm ghost" style={{ minHeight: 0, borderRadius: 0, border: 0 }} title="NULL 로 설정"
+        <button type="button" className="btn sm ghost" style={{ minHeight: 0, borderRadius: 0, border: 0 }} title="Set to NULL"
           onMouseDown={(e) => { e.preventDefault(); onCommit(null); }}>NULL</button>
       )}
     </div>

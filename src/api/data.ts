@@ -19,7 +19,7 @@ export function parseDocuments(text: string): Record<string, unknown>[] {
   if (!t) return [];
   if (t.startsWith('[')) {
     const arr = JSON.parse(t);
-    if (!Array.isArray(arr)) throw new Error('JSON 배열이 아닙니다');
+    if (!Array.isArray(arr)) throw new Error('Not a JSON array');
     return arr.map(asDoc);
   }
   if (t.startsWith('{')) {
@@ -35,13 +35,13 @@ export function parseDocuments(text: string): Record<string, unknown>[] {
     try {
       return asDoc(JSON.parse(l));
     } catch (e) {
-      throw new Error(`${i + 1}번째 줄: ${(e as Error).message}`);
+      throw new Error(`line ${i + 1}: ${(e as Error).message}`);
     }
   }).filter((d): d is Record<string, unknown> => d !== null);
 }
 
 function asDoc(v: unknown): Record<string, unknown> {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('객체가 아닌 항목이 있습니다');
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('Some items are not objects');
   return v as Record<string, unknown>;
 }
 

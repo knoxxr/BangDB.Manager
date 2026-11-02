@@ -83,9 +83,9 @@ export const BANGDB: Dialect = {
   id: 'bangdb', label: 'BangDB',
   q: dq, qt: dq,
   types: [
-    { decl: 'INTEGER', hint: '정수 (int64)' }, { decl: 'TEXT', hint: '문자열' }, { decl: 'REAL', hint: '실수 (float64)' }, { decl: 'BOOLEAN', hint: '참/거짓 (1/0)' },
-    { decl: 'JSON', hint: 'JSON 문서 (TEXT)' }, { decl: 'TIMESTAMP', hint: '날짜·시간 (TEXT)' }, { decl: 'DATE', hint: '날짜 (TEXT)' }, { decl: 'VARCHAR(255)', hint: '문자열' },
-    { decl: 'NUMERIC', hint: '숫자 (REAL)' }, { decl: 'UUID', hint: 'UUID (TEXT)' }, { decl: 'BLOB', hint: '바이너리' }, { decl: '', hint: 'ANY (변환 없음)' }
+    { decl: 'INTEGER', hint: 'integer (int64)' }, { decl: 'TEXT', hint: 'string' }, { decl: 'REAL', hint: 'float (float64)' }, { decl: 'BOOLEAN', hint: 'true/false (1/0)' },
+    { decl: 'JSON', hint: 'JSON document (TEXT)' }, { decl: 'TIMESTAMP', hint: 'date & time (TEXT)' }, { decl: 'DATE', hint: 'date (TEXT)' }, { decl: 'VARCHAR(255)', hint: 'string' },
+    { decl: 'NUMERIC', hint: 'number (REAL)' }, { decl: 'UUID', hint: 'UUID (TEXT)' }, { decl: 'BLOB', hint: 'binary' }, { decl: '', hint: 'ANY (no conversion)' }
   ],
   collations: ['NOCASE', 'RTRIM'],
   storage: true,
@@ -100,8 +100,8 @@ export const BANGDB: Dialect = {
   explain: { plan: 'EXPLAIN ', analyze: 'EXPLAIN ANALYZE ' },
   analyzeTable: (t) => `ANALYZE ${dq(t)}`,
   maintenance: [
-    { label: 'ANALYZE', desc: '인덱스 통계를 모아 조인 순서·인덱스 선택을 개선합니다', sql: 'ANALYZE' },
-    { label: 'VACUUM', desc: '파일을 새로 압축해 삭제로 빈 공간을 돌려받습니다 (쓰기는 끝날 때까지 대기)', sql: 'VACUUM', confirm: true }
+    { label: 'ANALYZE', desc: 'Collects index statistics to improve join order and index selection', sql: 'ANALYZE' },
+    { label: 'VACUUM', desc: 'Rewrites the file to reclaim space freed by deletes (writes wait until it finishes)', sql: 'VACUUM', confirm: true }
   ],
   literal: (v) => stdLiteral(v)
 };
@@ -109,19 +109,19 @@ export const BANGDB: Dialect = {
 export const SQLITE: Dialect = {
   ...BANGDB, id: 'sqlite', label: 'SQLite', storage: false,
   types: [
-    { decl: 'INTEGER', hint: '정수' }, { decl: 'TEXT', hint: '문자열' }, { decl: 'REAL', hint: '실수' }, { decl: 'NUMERIC', hint: '숫자' },
-    { decl: 'BOOLEAN', hint: '참/거짓 (1/0)' }, { decl: 'DATE', hint: '날짜 (TEXT)' }, { decl: 'DATETIME', hint: '날짜·시간 (TEXT)' }, { decl: 'JSON', hint: 'JSON (TEXT)' },
-    { decl: 'BLOB', hint: '바이너리' }, { decl: '', hint: '타입 없음' }
+    { decl: 'INTEGER', hint: 'integer' }, { decl: 'TEXT', hint: 'string' }, { decl: 'REAL', hint: 'float' }, { decl: 'NUMERIC', hint: 'number' },
+    { decl: 'BOOLEAN', hint: 'true/false (1/0)' }, { decl: 'DATE', hint: 'date (TEXT)' }, { decl: 'DATETIME', hint: 'date & time (TEXT)' }, { decl: 'JSON', hint: 'JSON (TEXT)' },
+    { decl: 'BLOB', hint: 'binary' }, { decl: '', hint: 'no type' }
   ],
   collations: ['NOCASE', 'RTRIM'],
   addColumn: { unique: false, check: true, references: true, keyword: 'ADD COLUMN' },
   explain: { plan: 'EXPLAIN QUERY PLAN ' },
   maintenance: [
-    { label: 'ANALYZE', desc: '쿼리 플래너 통계를 갱신합니다', sql: 'ANALYZE' },
-    { label: 'PRAGMA optimize', desc: '필요한 통계만 골라 갱신합니다', sql: 'PRAGMA optimize' },
-    { label: 'PRAGMA integrity_check', desc: '파일 무결성을 검사합니다 (결과 "ok" 면 정상)', sql: 'PRAGMA integrity_check' },
-    { label: 'PRAGMA foreign_key_check', desc: '외래 키를 어기는 행을 찾습니다', sql: 'PRAGMA foreign_key_check' },
-    { label: 'VACUUM', desc: '파일을 다시 써서 빈 공간을 돌려받습니다', sql: 'VACUUM', confirm: true }
+    { label: 'ANALYZE', desc: 'Refreshes query planner statistics', sql: 'ANALYZE' },
+    { label: 'PRAGMA optimize', desc: 'Refreshes only the statistics that need it', sql: 'PRAGMA optimize' },
+    { label: 'PRAGMA integrity_check', desc: 'Checks file integrity ("ok" means healthy)', sql: 'PRAGMA integrity_check' },
+    { label: 'PRAGMA foreign_key_check', desc: 'Finds rows that violate foreign keys', sql: 'PRAGMA foreign_key_check' },
+    { label: 'VACUUM', desc: 'Rewrites the file to reclaim free space', sql: 'VACUUM', confirm: true }
   ]
 };
 
@@ -129,10 +129,10 @@ export const POSTGRES: Dialect = {
   id: 'postgres', label: 'PostgreSQL',
   q: dq, qt: splitSchema(dq),
   types: [
-    { decl: 'integer', hint: '정수' }, { decl: 'bigint', hint: '큰 정수' }, { decl: 'text', hint: '문자열' }, { decl: 'varchar(255)', hint: '길이 제한 문자열' },
-    { decl: 'boolean', hint: '참/거짓' }, { decl: 'numeric(12,2)', hint: '고정 소수' }, { decl: 'double precision', hint: '실수' }, { decl: 'date', hint: '날짜' },
-    { decl: 'timestamp', hint: '날짜·시간' }, { decl: 'timestamptz', hint: '시간대 포함' }, { decl: 'jsonb', hint: 'JSON (색인 가능)' }, { decl: 'uuid', hint: 'UUID' },
-    { decl: 'bytea', hint: '바이너리' }, { decl: 'text[]', hint: '문자열 배열' }
+    { decl: 'integer', hint: 'integer' }, { decl: 'bigint', hint: 'big integer' }, { decl: 'text', hint: 'string' }, { decl: 'varchar(255)', hint: 'length-limited string' },
+    { decl: 'boolean', hint: 'true/false' }, { decl: 'numeric(12,2)', hint: 'fixed-point decimal' }, { decl: 'double precision', hint: 'float' }, { decl: 'date', hint: 'date' },
+    { decl: 'timestamp', hint: 'date & time' }, { decl: 'timestamptz', hint: 'with time zone' }, { decl: 'jsonb', hint: 'JSON (indexable)' }, { decl: 'uuid', hint: 'UUID' },
+    { decl: 'bytea', hint: 'binary' }, { decl: 'text[]', hint: 'string array' }
   ],
   collations: [],
   storage: false,
@@ -156,10 +156,10 @@ export const POSTGRES: Dialect = {
   explain: { plan: 'EXPLAIN ', analyze: 'EXPLAIN ANALYZE ' },
   analyzeTable: (t) => `ANALYZE ${POSTGRES.qt(t)}`,
   maintenance: [
-    { label: 'ANALYZE', desc: '모든 테이블의 통계를 갱신합니다', sql: 'ANALYZE' },
-    { label: 'VACUUM', desc: '죽은 행을 정리해 공간을 재사용 가능하게 합니다', sql: 'VACUUM' },
-    { label: 'VACUUM FULL', desc: '테이블을 새로 써서 공간을 OS 에 돌려줍니다 (테이블 잠금)', sql: 'VACUUM FULL', confirm: true },
-    { label: 'REINDEX', desc: '현재 DB 의 인덱스를 다시 만듭니다', sql: 'REINDEX DATABASE CURRENT_DATABASE', confirm: true }
+    { label: 'ANALYZE', desc: 'Refreshes statistics for all tables', sql: 'ANALYZE' },
+    { label: 'VACUUM', desc: 'Cleans up dead rows so their space can be reused', sql: 'VACUUM' },
+    { label: 'VACUUM FULL', desc: 'Rewrites tables to return space to the OS (locks tables)', sql: 'VACUUM FULL', confirm: true },
+    { label: 'REINDEX', desc: 'Rebuilds the indexes of the current database', sql: 'REINDEX DATABASE CURRENT_DATABASE', confirm: true }
   ],
   literal: (v) => stdLiteral(v, { bool: (b) => (b ? 'TRUE' : 'FALSE'), blob: (h) => `'\\x${h}'::bytea` }),
   dumpIdentity: (t, cols) => ({
@@ -174,9 +174,9 @@ export const MYSQL: Dialect = {
   id: 'mysql', label: 'MySQL',
   q: bq, qt: bq,
   types: [
-    { decl: 'INT', hint: '정수' }, { decl: 'BIGINT', hint: '큰 정수' }, { decl: 'VARCHAR(255)', hint: '문자열' }, { decl: 'TEXT', hint: '긴 문자열' },
-    { decl: 'BOOLEAN', hint: '참/거짓 (TINYINT(1))' }, { decl: 'DECIMAL(12,2)', hint: '고정 소수' }, { decl: 'DOUBLE', hint: '실수' }, { decl: 'DATE', hint: '날짜' },
-    { decl: 'DATETIME', hint: '날짜·시간' }, { decl: 'TIMESTAMP', hint: '타임스탬프' }, { decl: 'JSON', hint: 'JSON' }, { decl: "ENUM('a','b')", hint: '열거형' }, { decl: 'BLOB', hint: '바이너리' }
+    { decl: 'INT', hint: 'integer' }, { decl: 'BIGINT', hint: 'big integer' }, { decl: 'VARCHAR(255)', hint: 'string' }, { decl: 'TEXT', hint: 'long string' },
+    { decl: 'BOOLEAN', hint: 'true/false (TINYINT(1))' }, { decl: 'DECIMAL(12,2)', hint: 'fixed-point decimal' }, { decl: 'DOUBLE', hint: 'float' }, { decl: 'DATE', hint: 'date' },
+    { decl: 'DATETIME', hint: 'date & time' }, { decl: 'TIMESTAMP', hint: 'timestamp' }, { decl: 'JSON', hint: 'JSON' }, { decl: "ENUM('a','b')", hint: 'enum' }, { decl: 'BLOB', hint: 'binary' }
   ],
   collations: ['utf8mb4_general_ci', 'utf8mb4_unicode_ci', 'utf8mb4_bin', 'utf8mb4_0900_ai_ci'],
   storage: false,
@@ -193,9 +193,9 @@ export const MYSQL: Dialect = {
   explain: { plan: 'EXPLAIN ', analyze: 'EXPLAIN ANALYZE ' },
   analyzeTable: (t) => `ANALYZE TABLE ${bq(t)}`,
   maintenance: [
-    { label: 'ANALYZE TABLE', desc: '모든 테이블의 키 분포 통계를 갱신합니다', sql: (ts) => ts.map((t) => `ANALYZE TABLE ${bq(t)}`) },
-    { label: 'CHECK TABLE', desc: '모든 테이블의 오류를 검사합니다', sql: (ts) => ts.map((t) => `CHECK TABLE ${bq(t)}`) },
-    { label: 'OPTIMIZE TABLE', desc: '테이블을 다시 만들어 공간을 회수합니다 (잠금 발생)', sql: (ts) => ts.map((t) => `OPTIMIZE TABLE ${bq(t)}`), confirm: true }
+    { label: 'ANALYZE TABLE', desc: 'Refreshes key distribution statistics for all tables', sql: (ts) => ts.map((t) => `ANALYZE TABLE ${bq(t)}`) },
+    { label: 'CHECK TABLE', desc: 'Checks all tables for errors', sql: (ts) => ts.map((t) => `CHECK TABLE ${bq(t)}`) },
+    { label: 'OPTIMIZE TABLE', desc: 'Rebuilds tables to reclaim space (takes locks)', sql: (ts) => ts.map((t) => `OPTIMIZE TABLE ${bq(t)}`), confirm: true }
   ],
   literal: (v) => stdLiteral(v, { str: (s) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "''")}'` }),
   createDatabase: (n) => `CREATE DATABASE ${bq(n)} CHARACTER SET utf8mb4`,
@@ -206,9 +206,9 @@ export const MSSQL: Dialect = {
   id: 'mssql', label: 'SQL Server',
   q: sq, qt: splitSchema(sq),
   types: [
-    { decl: 'INT', hint: '정수' }, { decl: 'BIGINT', hint: '큰 정수' }, { decl: 'NVARCHAR(255)', hint: '유니코드 문자열' }, { decl: 'NVARCHAR(MAX)', hint: '긴 문자열' },
-    { decl: 'VARCHAR(255)', hint: '문자열' }, { decl: 'BIT', hint: '참/거짓' }, { decl: 'DECIMAL(12,2)', hint: '고정 소수' }, { decl: 'FLOAT', hint: '실수' },
-    { decl: 'DATE', hint: '날짜' }, { decl: 'DATETIME2', hint: '날짜·시간' }, { decl: 'UNIQUEIDENTIFIER', hint: 'GUID' }, { decl: 'VARBINARY(MAX)', hint: '바이너리' }
+    { decl: 'INT', hint: 'integer' }, { decl: 'BIGINT', hint: 'big integer' }, { decl: 'NVARCHAR(255)', hint: 'Unicode string' }, { decl: 'NVARCHAR(MAX)', hint: 'long string' },
+    { decl: 'VARCHAR(255)', hint: 'string' }, { decl: 'BIT', hint: 'true/false' }, { decl: 'DECIMAL(12,2)', hint: 'fixed-point decimal' }, { decl: 'FLOAT', hint: 'float' },
+    { decl: 'DATE', hint: 'date' }, { decl: 'DATETIME2', hint: 'date & time' }, { decl: 'UNIQUEIDENTIFIER', hint: 'GUID' }, { decl: 'VARBINARY(MAX)', hint: 'binary' }
   ],
   collations: ['Korean_Wansung_CI_AS', 'Latin1_General_CI_AS', 'Latin1_General_BIN2'],
   storage: false,
@@ -225,8 +225,8 @@ export const MSSQL: Dialect = {
   explain: null,
   analyzeTable: (t) => `UPDATE STATISTICS ${MSSQL.qt(t)}`,
   maintenance: [
-    { label: 'sp_updatestats', desc: '모든 테이블의 통계를 갱신합니다', sql: 'EXEC sp_updatestats' },
-    { label: 'DBCC CHECKDB', desc: '현재 DB 의 무결성을 검사합니다', sql: 'DBCC CHECKDB WITH NO_INFOMSGS', confirm: true }
+    { label: 'sp_updatestats', desc: 'Refreshes statistics for all tables', sql: 'EXEC sp_updatestats' },
+    { label: 'DBCC CHECKDB', desc: 'Checks the integrity of the current database', sql: 'DBCC CHECKDB WITH NO_INFOMSGS', confirm: true }
   ],
   literal: (v) => stdLiteral(v, { blob: (h) => `0x${h}`, str: (s) => `N'${s.replace(/'/g, "''")}'` }),
   dumpIdentity: (t, cols) => (cols.some((c) => c.autoinc) ? { before: [`SET IDENTITY_INSERT ${MSSQL.qt(t)} ON`], after: [`SET IDENTITY_INSERT ${MSSQL.qt(t)} OFF`] } : { before: [], after: [] }),

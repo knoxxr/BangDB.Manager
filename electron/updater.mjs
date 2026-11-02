@@ -62,9 +62,9 @@ export function initUpdater({ getWindow, onState }) {
     autoUpdater.on('update-downloaded', (info) => {
       set({ status: 'downloaded', version: info.version, percent: 100 });
       dialog.showMessageBox(win(), {
-        type: 'info', message: `BangDB Manager ${info.version} 이(가) 준비되었습니다`,
-        detail: '지금 재시작해 설치할까요? 나중에를 누르면 앱을 닫을 때 설치됩니다.',
-        buttons: ['지금 재시작', '나중에'], defaultId: 0, cancelId: 1
+        type: 'info', message: `BangDB Manager ${info.version} is ready`,
+        detail: 'Restart now to install? If you choose Later, it will be installed when the app closes.',
+        buttons: ['Restart now', 'Later'], defaultId: 0, cancelId: 1
       }).then((r) => { if (r.response === 0) setImmediate(() => autoUpdater.quitAndInstall()); });
     });
   }
@@ -76,7 +76,7 @@ export function initUpdater({ getWindow, onState }) {
 /** Check now. With manual=true the result is always shown in a dialog. */
 export async function check(manual) {
   if (state.mode === 'off') {
-    if (manual) dialog.showMessageBox(win(), { type: 'info', message: '자동 업데이트가 꺼져 있습니다', detail: app.isPackaged ? 'BANGDB_MANAGER_NO_UPDATE 환경 변수가 설정되어 있습니다.' : '개발 모드에서는 동작하지 않습니다.' });
+    if (manual) dialog.showMessageBox(win(), { type: 'info', message: 'Automatic updates are off', detail: app.isPackaged ? 'The BANGDB_MANAGER_NO_UPDATE environment variable is set.' : 'Not available in development mode.' });
     return;
   }
   if (state.mode === 'auto') {
@@ -84,13 +84,13 @@ export async function check(manual) {
       const r = await autoUpdater.checkForUpdates();
       const v = r?.updateInfo?.version;
       if (manual && v && compareVersions(v, app.getVersion()) <= 0) {
-        dialog.showMessageBox(win(), { type: 'info', message: '최신 버전입니다', detail: `현재 ${app.getVersion()}` });
+        dialog.showMessageBox(win(), { type: 'info', message: "You're up to date", detail: `Current version: ${app.getVersion()}` });
       } else if (manual && v) {
-        dialog.showMessageBox(win(), { type: 'info', message: `${v} 다운로드 중`, detail: '내려받기가 끝나면 설치 여부를 물어봅니다.' });
+        dialog.showMessageBox(win(), { type: 'info', message: `Downloading ${v}`, detail: 'You will be asked to install once the download finishes.' });
       }
     } catch (e) {
       set({ status: 'error', error: e?.message ?? String(e) });
-      if (manual) dialog.showErrorBox('업데이트 확인 실패', state.error);
+      if (manual) dialog.showErrorBox('Update check failed', state.error);
     }
     return;
   }
@@ -101,37 +101,37 @@ export async function check(manual) {
     if (!res.ok) throw new Error(`GitHub ${res.status}`);
     const rel = await res.json();
     const latest = String(rel.tag_name ?? '').replace(/^v/, '');
-    if (!latest) throw new Error('태그를 찾을 수 없습니다');
+    if (!latest) throw new Error('Tag not found');
     if (compareVersions(latest, app.getVersion()) <= 0) {
       set({ status: 'none', version: latest });
-      if (manual) dialog.showMessageBox(win(), { type: 'info', message: '최신 버전입니다', detail: `현재 ${app.getVersion()}` });
+      if (manual) dialog.showMessageBox(win(), { type: 'info', message: "You're up to date", detail: `Current version: ${app.getVersion()}` });
       return;
     }
     set({ status: 'available', version: latest });
     const p = prefs();
     if (!manual && p.skip === latest) return;
     const r = await dialog.showMessageBox(win(), {
-      type: 'info', message: `새 버전 ${latest} 이(가) 있습니다 (현재 ${app.getVersion()})`,
-      detail: `${process.platform === 'darwin' ? 'macOS' : 'deb'} 빌드는 자동 설치를 지원하지 않습니다. 다운로드 페이지에서 새 설치 파일을 받아 주세요.`,
-      buttons: ['다운로드 페이지 열기', '이 버전 건너뛰기', '나중에'], defaultId: 0, cancelId: 2
+      type: 'info', message: `New version ${latest} available (current: ${app.getVersion()})`,
+      detail: `The ${process.platform === 'darwin' ? 'macOS' : 'deb'} build does not support automatic installation. Download the new installer from the download page.`,
+      buttons: ['Open download page', 'Skip this version', 'Later'], defaultId: 0, cancelId: 2
     });
     if (r.response === 0) shell.openExternal(rel.html_url || RELEASES);
     if (r.response === 1) savePrefs({ ...p, skip: latest });
   } catch (e) {
     set({ status: 'error', error: e?.message ?? String(e) });
-    if (manual) dialog.showErrorBox('업데이트 확인 실패', state.error);
+    if (manual) dialog.showErrorBox('Update check failed', state.error);
   }
 }
 
 /** Short text for the menu. */
 export function statusLabel() {
   switch (state.status) {
-    case 'checking': return '업데이트 확인 중…';
-    case 'downloading': return `업데이트 ${state.version} 내려받는 중 ${state.percent}%`;
-    case 'downloaded': return `업데이트 ${state.version} 설치 준비됨 (재시작 시 적용)`;
-    case 'available': return `새 버전 ${state.version} 있음`;
-    case 'none': return `최신 버전 (${app.getVersion()})`;
-    case 'error': return `업데이트 오류: ${state.error.slice(0, 60)}`;
-    default: return state.mode === 'off' ? '자동 업데이트 꺼짐' : `버전 ${app.getVersion()}`;
+    case 'checking': return 'Checking for updates…';
+    case 'downloading': return `Downloading update ${state.version} ${state.percent}%`;
+    case 'downloaded': return `Update ${state.version} ready to install (applied on restart)`;
+    case 'available': return `New version ${state.version} available`;
+    case 'none': return `Up to date (${app.getVersion()})`;
+    case 'error': return `Update error: ${state.error.slice(0, 60)}`;
+    default: return state.mode === 'off' ? 'Automatic updates off' : `Version ${app.getVersion()}`;
   }
 }

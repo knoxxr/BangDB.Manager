@@ -31,7 +31,7 @@ export function createProxyServer({ dist, defaultTarget = 'http://127.0.0.1:1808
         if (await gateway(req, res, cors)) return;
       } else {
         res.writeHead(501, { ...cors, 'content-type': 'application/json' });
-        return res.end(JSON.stringify({ error: '이 서버에는 DB 게이트웨이가 없습니다 (proxy/ 에서 npm install 을 실행하세요)', code: 'no_gateway' }));
+        return res.end(JSON.stringify({ error: 'This server has no DB gateway (run npm install in proxy/)', code: 'no_gateway' }));
       }
     }
     if (req.url.startsWith('/bangdb/')) {

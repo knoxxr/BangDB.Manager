@@ -142,7 +142,7 @@ export function storageSql(s: StorageSpec | undefined): string {
   const opts: string[] = [];
   if (s.using === 'memory' && s.persist) opts.push('persist = true');
   if (s.using === 'timeseries') {
-    if (!s.timeColumn?.trim()) throw new Error('시계열 테이블은 시간 컬럼을 지정해야 합니다');
+    if (!s.timeColumn?.trim()) throw new Error('Time-series tables require a time column');
     opts.push(`time_column = ${qi(s.timeColumn.trim())}`);
     if (s.timeUnit) opts.push(`time_unit = '${s.timeUnit}'`);
     if (s.retention?.trim()) opts.push(`retention = '${s.retention.trim().replace(/'/g, "''")}'`);
@@ -164,9 +164,9 @@ export interface CreateTableOptions {
 
 export function createTableSql(spec: CreateTableSpec & CreateTableOptions, d: Dialect = BANGDB): string {
   if (spec.sql?.trim()) return spec.sql.trim();
-  if (!spec.table_name?.trim()) throw new Error('테이블 이름을 입력하세요');
+  if (!spec.table_name?.trim()) throw new Error('Enter a table name');
   const cols = (spec.columns ?? []).filter((c) => c.name.trim());
-  if (!cols.length) throw new Error('컬럼을 하나 이상 지정하세요');
+  if (!cols.length) throw new Error('Specify at least one column');
   const pkCols = cols.filter((c) => c.pk);
   const composite = pkCols.length > 1;
   const defs = cols.map((c) => columnDefSql(c, { pkInline: !composite }, d));
@@ -192,7 +192,7 @@ export const createView = (c: Connection, name: string, select: string) => execS
 export const dropView = (c: Connection, name: string) => execSql(c, `DROP VIEW ${dialectOf(c).qt(name)}`);
 
 export function createIndexSql(table: string, columns: string[], opts: { name?: string; unique?: boolean } = {}, d: Dialect = BANGDB): string {
-  if (!columns.length) throw new Error('인덱스 컬럼을 하나 이상 선택하세요');
+  if (!columns.length) throw new Error('Select at least one index column');
   const base = table.includes('.') ? table.slice(table.indexOf('.') + 1) : table;
   const name = opts.name?.trim() || `idx_${base}_${columns.join('_')}`.replace(/[^\w]/g, '_');
   return `CREATE ${opts.unique ? 'UNIQUE ' : ''}INDEX ${d.q(name)} ON ${d.qt(table)} (${columns.map(d.q).join(', ')})`;
@@ -221,35 +221,35 @@ export async function rowCount(c: Connection, table: string): Promise<ApiResult<
 export function insertRow(c: Connection, table: string, doc: Record<string, unknown>) {
   const d = dialectOf(c);
   const cols = Object.keys(doc);
-  if (!cols.length) throw new Error('값을 하나 이상 입력하세요');
+  if (!cols.length) throw new Error('Enter at least one value');
   const sql = `INSERT INTO ${d.qt(table)} (${cols.map(d.q).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`;
   return goQuery(c, sql, cols.map((k) => sqlValue(doc[k])), { mode: 'exec' });
 }
 
 export function updateRow(c: Connection, table: string, doc: Record<string, unknown>, original: Record<string, unknown>, pk: string[]) {
-  if (!pk.length) throw new Error('기본 키가 없는 테이블은 행을 수정할 수 없습니다. SQL 콘솔을 사용하세요.');
+  if (!pk.length) throw new Error('Rows cannot be updated in a table without a primary key. Use the SQL console.');
   const d = dialectOf(c);
   const cols = Object.keys(doc).filter((k) => !pk.includes(k) || doc[k] !== original[k]);
-  if (!cols.length) throw new Error('변경된 값이 없습니다');
+  if (!cols.length) throw new Error('No values changed');
   const sql = `UPDATE ${d.qt(table)} SET ${cols.map((k) => `${d.q(k)} = ?`).join(', ')} WHERE ${pk.map((k) => `${d.q(k)} = ?`).join(' AND ')}`;
   return goQuery(c, sql, [...cols.map((k) => sqlValue(doc[k])), ...pk.map((k) => sqlValue(original[k]))], { mode: 'exec' });
 }
 
 export function deleteRow(c: Connection, table: string, original: Record<string, unknown>, pk: string[]) {
-  if (!pk.length) throw new Error('기본 키가 없는 테이블은 행을 삭제할 수 없습니다. SQL 콘솔을 사용하세요.');
+  if (!pk.length) throw new Error('Rows cannot be deleted in a table without a primary key. Use the SQL console.');
   const d = dialectOf(c);
   const sql = `DELETE FROM ${d.qt(table)} WHERE ${pk.map((k) => `${d.q(k)} = ?`).join(' AND ')}`;
   return goQuery(c, sql, pk.map((k) => sqlValue(original[k])), { mode: 'exec' });
 }
 
 export function getRow(c: Connection, table: string, pk: string[], key: string) {
-  if (!pk.length) throw new Error('기본 키가 없는 테이블입니다');
+  if (!pk.length) throw new Error('Table has no primary key');
   const d = dialectOf(c);
   return goQuery(c, `SELECT * FROM ${d.qt(table)} WHERE ${d.q(pk[0])} = ?`, [coerceKey(key)], { limit: 1 });
 }
 
 export function deleteByKey(c: Connection, table: string, pk: string[], key: string) {
-  if (!pk.length) throw new Error('기본 키가 없는 테이블입니다');
+  if (!pk.length) throw new Error('Table has no primary key');
   const d = dialectOf(c);
   return goQuery(c, `DELETE FROM ${d.qt(table)} WHERE ${d.q(pk[0])} = ?`, [coerceKey(key)], { mode: 'exec' });
 }
@@ -345,11 +345,11 @@ export function changeStatements(table: string, changes: RowChange[], d: Dialect
       out.push({ sql: `UPDATE ${T} SET ${cols.map((k) => `${d.q(k)} = ?`).join(', ')} WHERE ${w.sql}`, args: [...cols.map((k) => sqlValue(ch.values[k])), ...w.args] });
     } else {
       const cols = Object.keys(ch.values);
-      if (!cols.length) throw new Error('새 행에 값을 하나 이상 입력하세요');
+      if (!cols.length) throw new Error('Enter at least one value for the new row');
       out.push({ sql: `INSERT INTO ${T} (${cols.map(d.q).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, args: cols.map((k) => sqlValue(ch.values[k])) });
     }
   }
-  if (!out.length) throw new Error('저장할 변경 사항이 없습니다');
+  if (!out.length) throw new Error('No changes to save');
   return out;
 }
 
@@ -388,14 +388,14 @@ export function parseInput(text: string, col: ColumnInfo | undefined): unknown {
   const t = text.trim();
   if (a === 'INTEGER') {
     if (!t) return null;
-    if (!/^[-+]?\d+$/.test(t)) throw new Error(`${col?.name ?? '값'}: 정수가 아닙니다`);
+    if (!/^[-+]?\d+$/.test(t)) throw new Error(`${col?.name ?? 'value'}: not an integer`);
     const n = Number(t);
     return Number.isSafeInteger(n) ? n : t;
   }
   if (a === 'REAL') {
     if (!t) return null;
     const n = Number(t);
-    if (!Number.isFinite(n)) throw new Error(`${col?.name ?? '값'}: 숫자가 아닙니다`);
+    if (!Number.isFinite(n)) throw new Error(`${col?.name ?? 'value'}: not a number`);
     return n;
   }
   if (a === 'ANY' && /^[-+]?\d+(\.\d+)?$/.test(t)) return Number(t);
@@ -464,10 +464,10 @@ export async function dumpSql(c: Connection, onProgress?: (msg: string) => void,
   const tables = orderByDependencies(all.filter((t) => t.kind === 'table'));
   const out: string[] = [`-- ${d.label} dump ${new Date().toISOString()}`, ''];
   for (const t of tables) {
-    onProgress?.(`${t.name} 읽는 중…`);
+    onProgress?.(`Reading ${t.name}…`);
     out.push(`-- ${t.name}`, endStmt(t.sql ?? ''));
     const ident = d.id === 'bangdb' || t.rowid === 'rowid' ? 'rowid' : primaryKeyColumns(t).map(d.q).join(', ');
-    const { columns, rows } = await readAll(c, t.name, (n) => onProgress?.(`${t.name}: ${n}행`), 500, undefined, ident);
+    const { columns, rows } = await readAll(c, t.name, (n) => onProgress?.(`${t.name}: ${n} rows`), 500, undefined, ident);
     const wrap = d.dumpIdentity?.(t.name, t.columns ?? []) ?? { before: [], after: [] };
     if (rows.length) out.push(...wrap.before.map(endStmt));
     const head = `INSERT INTO ${d.qt(t.name)} (${columns.map(d.q).join(', ')}) VALUES`;
@@ -560,7 +560,7 @@ export async function runScript(c: Connection, script: string, onProgress?: (p: 
     if (!r.ok) {
       const at = (r.data as { statement?: number } | null)?.statement;
       p.error = errorText(r);
-      p.failedSql = at !== undefined && chunk[at] ? chunk[at].slice(0, 500) : chunk.length === 1 ? chunk[0] : `${chunk[0].slice(0, 200)} … (문장 ${chunk.length}개 묶음)`;
+      p.failedSql = at !== undefined && chunk[at] ? chunk[at].slice(0, 500) : chunk.length === 1 ? chunk[0] : `${chunk[0].slice(0, 200)} … (batch of ${chunk.length} statements)`;
       onProgress?.({ ...p });
       return p;
     }
@@ -577,7 +577,7 @@ export const insertModes = (d: Dialect): InsertMode[] =>
   d.id === 'mssql' ? ['insert'] : d.id === 'postgres' ? ['insert', 'ignore'] : ['insert', 'ignore', 'replace'];
 
 export function insertBatchSql(table: string, cols: string[], rows: unknown[][], mode: InsertMode = 'insert', d: Dialect = BANGDB): { sql: string; args: unknown[] } {
-  if (!insertModes(d).includes(mode)) throw new Error(`${d.label} 는 이 중복 처리 방식을 지원하지 않습니다`);
+  if (!insertModes(d).includes(mode)) throw new Error(`${d.label} does not support this duplicate handling mode`);
   const verb = mode === 'insert' ? 'INSERT'
     : d.id === 'mysql' ? (mode === 'ignore' ? 'INSERT IGNORE' : 'REPLACE')
     : d.id === 'postgres' ? 'INSERT'
@@ -597,7 +597,7 @@ export async function bulkInsert(c: Connection, table: string, docs: Record<stri
   const cols: string[] = [];
   docs.forEach((doc) => Object.keys(doc).forEach((k) => { if (!cols.includes(k)) cols.push(k); }));
   const p: BulkProgress = { done: 0, total: docs.length, inserted: 0 };
-  if (!cols.length) return { ...p, error: '컬럼이 없습니다' };
+  if (!cols.length) return { ...p, error: 'No columns' };
   // SQL Server takes at most 2100 parameters and 1000 rows per VALUES
   const batch = Math.max(1, Math.min(opts.batch ?? 200, d.id === 'mssql' ? Math.floor(2000 / cols.length) : 1000));
   for (let i = 0; i < docs.length; i += batch) {
@@ -606,7 +606,7 @@ export async function bulkInsert(c: Connection, table: string, docs: Record<stri
     const { sql, args } = insertBatchSql(table, cols, part.map((doc) => cols.map((k) => (k in doc ? doc[k] : null))), opts.mode, d);
     const r = await goQuery(c, sql, args, { mode: 'exec' });
     if (!r.ok) {
-      p.error = `${i + 1}~${i + part.length}번째 행: ${errorText(r)}`;
+      p.error = `rows ${i + 1}–${i + part.length}: ${errorText(r)}`;
       opts.onProgress?.({ ...p });
       return p;
     }

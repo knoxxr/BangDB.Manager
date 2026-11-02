@@ -1,3 +1,7 @@
+## v0.5.0 — English UI
+
+- The whole interface (web, desktop menus and dialogs, update prompts, gateway error messages) is now in English.
+
 ## v0.4.0 — 자동 업데이트, UI 디자인 개선
 
 **자동 업데이트**

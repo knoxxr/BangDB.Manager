@@ -1,5 +1,7 @@
 # BangDB Manager
 
+> UI 언어는 영어입니다. 이 문서는 한국어로 유지합니다.
+
 BangDB 와 주요 데이터베이스(PostgreSQL, MySQL/MariaDB, SQL Server, SQLite, MongoDB, Redis)의 데이터베이스·테이블·데이터를 관리하는 **크로스플랫폼 관리 앱**입니다.
 하나의 코드베이스로 다음 환경에서 동작합니다.
 

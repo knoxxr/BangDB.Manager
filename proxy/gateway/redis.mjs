@@ -37,13 +37,13 @@ export async function redis(conn) {
         case 'set': { length = Number(await cmd(['SCARD', k])); const [, m] = await cmd(['SSCAN', k, '0', 'COUNT', String(n)]); value = m; break; }
         case 'zset': length = Number(await cmd(['ZCARD', k])); value = pairs(await cmd(['ZRANGE', k, '0', String(n - 1), 'WITHSCORES'])).map(([member, score]) => ({ member, score: Number(score) })); break;
         case 'stream': length = Number(await cmd(['XLEN', k])); value = (await cmd(['XREVRANGE', k, '+', '-', 'COUNT', String(n)])).map(([id, kv]) => ({ id, fields: Object.fromEntries(pairs(kv)) })); break;
-        case 'none': throw Object.assign(new Error(`키가 없습니다: ${k}`), { status: 404 });
+        case 'none': throw Object.assign(new Error(`No such key: ${k}`), { status: 404 });
         default: value = null;
       }
       return { key: k, type, ttl, length, value };
     },
     async command(b) {
-      if (!Array.isArray(b.args) || !b.args.length) throw Object.assign(new Error('args 배열이 필요합니다'), { status: 400 });
+      if (!Array.isArray(b.args) || !b.args.length) throw Object.assign(new Error('An args array is required'), { status: 400 });
       return { result: await cmd(b.args) };
     },
     async multi(b) {

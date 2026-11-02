@@ -20,12 +20,12 @@ export default function Layout() {
   const rest = kind === 'rest' || kind === undefined;
   const dbPath = base ? `${base}/db/${encodeURIComponent(active!.defaultDb)}` : '/connections';
   const links: { to: string; label: string; icon: JSX.Element; disabled?: boolean; end?: boolean }[] = [
-    { to: '/connections', label: '서버', icon: I.server },
-    { to: base ? `${base}/dbs` : '/connections', label: rest ? 'DB' : kind === 'redis' ? '키' : '개요', icon: rest ? I.db : kind === 'redis' ? I.db : I.chart, disabled: !base },
-    ...(kind && kind !== 'rest' && kind !== 'redis' ? [{ to: dbPath, label: kind === 'mongodb' ? '컬렉션' : '테이블', icon: I.db, end: true }] : []),
+    { to: '/connections', label: 'Servers', icon: I.server },
+    { to: base ? `${base}/dbs` : '/connections', label: rest ? 'DB' : kind === 'redis' ? 'Keys' : 'Overview', icon: rest ? I.db : kind === 'redis' ? I.db : I.chart, disabled: !base },
+    ...(kind && kind !== 'rest' && kind !== 'redis' ? [{ to: dbPath, label: kind === 'mongodb' ? 'Collections' : 'Tables', icon: I.db, end: true }] : []),
     ...(kind !== 'mongodb' && kind !== 'redis' ? [{ to: `${dbPath}/query`, label: 'SQL', icon: I.sql, disabled: !base }] : []),
     ...(kind === 'go' || rest ? [{ to: base ? `${base}/console` : '/connections', label: 'REST', icon: I.console, disabled: !base }] : []),
-    { to: '/about', label: '정보', icon: I.info }
+    { to: '/about', label: 'About', icon: I.info }
   ];
   const nav = (cls: string) => (
     <nav className={cls}>
@@ -36,9 +36,9 @@ export default function Layout() {
         </NavLink>
       ))}
       {cls === 'sidenav' && active && (
-        <NavLink to="/connections" className="cur" title="서버 바꾸기">
+        <NavLink to="/connections" className="cur" title="Switch server">
           <KindBadge kind={active.kind} small />
-          <span className="t"><b>{active.name}</b><span>{KIND_STYLE[active.kind]?.label ?? active.kind} · 바꾸려면 클릭</span></span>
+          <span className="t"><b>{active.name}</b><span>{KIND_STYLE[active.kind]?.label ?? active.kind} · click to switch</span></span>
         </NavLink>
       )}
     </nav>

@@ -15,25 +15,25 @@ export function TypeSelect({ value, onChange, types = COLUMN_TYPES }: { value: s
   if (custom) {
     return (
       <div className="row" style={{ gap: 4 }}>
-        <input className="inp mono grow" value={value} placeholder="예: VARCHAR(40)" onChange={(e) => onChange(e.target.value)} />
-        <button className="btn sm ghost" onClick={() => { setCustom(false); onChange(types[0].decl); }} title="목록에서 선택">▾</button>
+        <input className="inp mono grow" value={value} placeholder="e.g. VARCHAR(40)" onChange={(e) => onChange(e.target.value)} />
+        <button className="btn sm ghost" onClick={() => { setCustom(false); onChange(types[0].decl); }} title="Pick from the list">▾</button>
       </div>
     );
   }
   return (
     <select className="inp" value={types.find((t) => t.decl.toLowerCase() === value.toLowerCase())?.decl ?? value} onChange={(e) => (e.target.value === '__custom' ? setCustom(true) : onChange(e.target.value))}>
       {types.map((t) => <option key={t.decl} value={t.decl}>{t.decl || 'ANY'} — {t.hint}</option>)}
-      <option value="__custom">직접 입력…</option>
+      <option value="__custom">Custom…</option>
     </select>
   );
 }
 
 /** Collation picker: the dialect's list, or free text where it has none. */
 function CollateInput({ d, value, onChange, label }: { d: Dialect; value: string; onChange: (v: string) => void; label?: boolean }) {
-  if (!d.collations.length) return <input className="inp mono" value={value} placeholder={label ? 'COLLATE (선택)' : '예: "C"'} onChange={(e) => onChange(e.target.value)} />;
+  if (!d.collations.length) return <input className="inp mono" value={value} placeholder={label ? 'COLLATE (optional)' : 'e.g. "C"'} onChange={(e) => onChange(e.target.value)} />;
   return (
     <select className="inp" value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{label ? '정렬 규칙: 기본' : '기본'}</option>
+      <option value="">{label ? 'Collation: default' : 'Default'}</option>
       {d.collations.map((c) => <option key={c} value={c}>{c}</option>)}
     </select>
   );
@@ -55,7 +55,7 @@ function initialColumns(d: Dialect): ColDraft[] {
   ];
 }
 
-const autoLabel = (d: Dialect) => (d.id === 'mysql' ? 'AUTO_INCREMENT' : d.id === 'mssql' ? 'IDENTITY' : d.id === 'postgres' ? 'IDENTITY (자동 번호)' : 'AUTOINCREMENT');
+const autoLabel = (d: Dialect) => (d.id === 'mysql' ? 'AUTO_INCREMENT' : d.id === 'mssql' ? 'IDENTITY' : d.id === 'postgres' ? 'IDENTITY (auto number)' : 'AUTOINCREMENT');
 const canAuto = (d: Dialect, c: ColumnInfo) => !!c.pk && /INT|SERIAL/i.test(c.decl ?? '');
 
 /** CREATE TABLE builder: columns with every constraint the database supports, storage options and raw SQL. */
@@ -91,84 +91,84 @@ export function CreateTableModal({ tables, d = BANGDB, onClose, onCreate }: { ta
   const tableNames = tables.filter((t) => t.kind === 'table').map((t) => t.name);
 
   return (
-    <Modal title={`테이블 만들기 — ${d.label}`} onClose={onClose} wide>
+    <Modal title={`Create table — ${d.label}`} onClose={onClose} wide>
       <div className="grid2">
-        <Field label={d.id === 'postgres' || d.id === 'mssql' ? '테이블 이름 (스키마.이름 가능)' : '테이블 이름'}><input className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="예: users" /></Field>
+        <Field label={d.id === 'postgres' || d.id === 'mssql' ? 'Table name (schema.name allowed)' : 'Table name'}><input className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. users" /></Field>
         {d.storage && (
-          <Field label="저장 방식">
+          <Field label="Storage">
             <select value={storage.using} onChange={(e) => setStorage({ ...storage, using: e.target.value as StorageSpec['using'] })}>
-              <option value="">기본 (B+트리, 디스크)</option>
-              <option value="memory">인메모리 (USING memory)</option>
-              <option value="timeseries">시계열 (USING timeseries)</option>
+              <option value="">Default (B+ tree, on disk)</option>
+              <option value="memory">In-memory (USING memory)</option>
+              <option value="timeseries">Time series (USING timeseries)</option>
             </select>
           </Field>
         )}
       </div>
       {d.storage && storage.using === 'memory' && (
         <div className="card" style={{ padding: 10 }}>
-          <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={!!storage.persist} onChange={(e) => setStorage({ ...storage, persist: e.target.checked })} /> 정상 종료 시 저장 후 다음 시작 때 복원 (persist = true)</label>
-          <p className="muted small" style={{ margin: '6px 0 0' }}>인메모리 테이블의 데이터는 프로세스가 살아 있는 동안만 유지되며 백업·복제 대상이 아닙니다.</p>
+          <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={!!storage.persist} onChange={(e) => setStorage({ ...storage, persist: e.target.checked })} /> Save on clean shutdown and restore on next start (persist = true)</label>
+          <p className="muted small" style={{ margin: '6px 0 0' }}>Data in an in-memory table lives only while the process runs and is not backed up or replicated.</p>
         </div>
       )}
       {ts && (
         <div className="card" style={{ padding: 10 }}>
           <div className="grid2">
-            <Field label="시간 컬럼 (INTEGER epoch, 필수)">
+            <Field label="Time column (INTEGER epoch, required)">
               <select value={storage.timeColumn ?? ''} onChange={(e) => setStorage({ ...storage, timeColumn: e.target.value })}>
-                <option value="">선택…</option>
+                <option value="">Select…</option>
                 {intCols.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
             </Field>
-            <Field label="시간 단위">
+            <Field label="Time unit">
               <select value={storage.timeUnit ?? 's'} onChange={(e) => setStorage({ ...storage, timeUnit: e.target.value as StorageSpec['timeUnit'] })}>
-                <option value="s">초 (s)</option><option value="ms">밀리초 (ms)</option><option value="us">마이크로초 (us)</option>
+                <option value="s">Seconds (s)</option><option value="ms">Milliseconds (ms)</option><option value="us">Microseconds (us)</option>
               </select>
             </Field>
-            <Field label="보존 기간 (선택)"><input value={storage.retention ?? ''} placeholder="예: 30 days" onChange={(e) => setStorage({ ...storage, retention: e.target.value })} /></Field>
-            <Field label="블록 행 수 (선택, 기본 1024)"><input type="number" min={1} value={storage.blockRows ?? ''} onChange={(e) => setStorage({ ...storage, blockRows: Number(e.target.value) || undefined })} /></Field>
+            <Field label="Retention (optional)"><input value={storage.retention ?? ''} placeholder="e.g. 30 days" onChange={(e) => setStorage({ ...storage, retention: e.target.value })} /></Field>
+            <Field label="Rows per block (optional, default 1024)"><input type="number" min={1} value={storage.blockRows ?? ''} onChange={(e) => setStorage({ ...storage, blockRows: Number(e.target.value) || undefined })} /></Field>
           </div>
-          <p className="muted small" style={{ margin: 0 }}>시계열 테이블에는 PRIMARY KEY·UNIQUE·보조 인덱스를 둘 수 없습니다.</p>
+          <p className="muted small" style={{ margin: 0 }}>A time-series table cannot have a PRIMARY KEY, UNIQUE constraints or secondary indexes.</p>
         </div>
       )}
 
       {rawSql === null ? (
         <>
-          <div className="row" style={{ margin: '4px 0 8px' }}><b className="grow">컬럼</b><span className="muted small">PK 를 여러 개 고르면 복합 기본 키가 됩니다</span></div>
+          <div className="row" style={{ margin: '4px 0 8px' }}><b className="grow">Columns</b><span className="muted small">Selecting PK on several columns makes a composite primary key</span></div>
           {cols.map((c, i) => (
             <div key={c.id} className="builder-col">
-              <input className="inp mono" placeholder="컬럼 이름" value={c.name} onChange={(e) => up(c.id, { name: e.target.value })} />
+              <input className="inp mono" placeholder="Column name" value={c.name} onChange={(e) => up(c.id, { name: e.target.value })} />
               <TypeSelect value={c.decl ?? ''} types={d.types} onChange={(v) => up(c.id, { decl: v })} />
               <div className="row" style={{ gap: 2 }}>
-                <button className="btn sm ghost" disabled={i === 0} onClick={() => moveCol(c.id, -1)} title="위로">↑</button>
-                <button className="btn sm ghost" disabled={i === cols.length - 1} onClick={() => moveCol(c.id, 1)} title="아래로">↓</button>
+                <button className="btn sm ghost" disabled={i === 0} onClick={() => moveCol(c.id, -1)} title="Move up">↑</button>
+                <button className="btn sm ghost" disabled={i === cols.length - 1} onClick={() => moveCol(c.id, 1)} title="Move down">↓</button>
               </div>
-              <button className="btn sm ghost" onClick={() => setCols((l) => l.filter((x) => x.id !== c.id))} aria-label="컬럼 삭제" title="삭제">✕</button>
+              <button className="btn sm ghost" onClick={() => setCols((l) => l.filter((x) => x.id !== c.id))} aria-label="Delete column" title="Delete">✕</button>
               <div className="flags">
                 {!ts && <label><input type="checkbox" checked={!!c.pk} onChange={(e) => up(c.id, { pk: e.target.checked })} />PRIMARY KEY</label>}
-                {!ts && canAuto(d, c) && <label title={d.id === 'bangdb' || d.id === 'sqlite' ? '삭제된 번호를 재사용하지 않음 (INTEGER PRIMARY KEY 는 이미 자동 번호)' : '새 행에 번호를 자동으로 붙임'}><input type="checkbox" checked={!!c.autoinc} onChange={(e) => up(c.id, { autoinc: e.target.checked })} />{autoLabel(d)}</label>}
+                {!ts && canAuto(d, c) && <label title={d.id === 'bangdb' || d.id === 'sqlite' ? 'Never reuse deleted numbers (INTEGER PRIMARY KEY is already auto-numbered)' : 'Assign a number to each new row automatically'}><input type="checkbox" checked={!!c.autoinc} onChange={(e) => up(c.id, { autoinc: e.target.checked })} />{autoLabel(d)}</label>}
                 <label><input type="checkbox" checked={!!c.notNull} onChange={(e) => up(c.id, { notNull: e.target.checked })} />NOT NULL</label>
                 {!ts && <label><input type="checkbox" checked={!!c.unique} onChange={(e) => up(c.id, { unique: e.target.checked })} />UNIQUE</label>}
-                <a href="#" onClick={(e) => { e.preventDefault(); up(c.id, { open: !c.open }); }}>{c.open ? '접기' : '기본값·CHECK·외래 키…'}</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); up(c.id, { open: !c.open }); }}>{c.open ? 'Collapse' : 'Default · CHECK · foreign key…'}</a>
                 {!c.open && [c.default && `DEFAULT ${c.default}`, c.collate && `COLLATE ${c.collate}`, c.check && `CHECK`, c.refTable && `→ ${c.refTable}`].filter(Boolean).map((t) => <span key={String(t)} className="badge">{t}</span>)}
               </div>
               {c.open && (
                 <div className="more">
-                  <input className="inp mono" placeholder={`DEFAULT (예: 0, 'a', ${d.id === 'mssql' ? 'GETDATE()' : 'CURRENT_TIMESTAMP'})`} value={c.default ?? ''} onChange={(e) => up(c.id, { default: e.target.value })} />
+                  <input className="inp mono" placeholder={`DEFAULT (e.g. 0, 'a', ${d.id === 'mssql' ? 'GETDATE()' : 'CURRENT_TIMESTAMP'})`} value={c.default ?? ''} onChange={(e) => up(c.id, { default: e.target.value })} />
                   <CollateInput d={d} label value={c.collate ?? ''} onChange={(v) => up(c.id, { collate: v })} />
-                  <input className="inp mono" placeholder="CHECK (예: age >= 0)" value={c.check ?? ''} onChange={(e) => up(c.id, { check: e.target.value })} />
+                  <input className="inp mono" placeholder="CHECK (e.g. age >= 0)" value={c.check ?? ''} onChange={(e) => up(c.id, { check: e.target.value })} />
                   <select className="inp" value={c.refTable ?? ''} onChange={(e) => up(c.id, { refTable: e.target.value, refColumn: '' })}>
-                    <option value="">외래 키: 없음</option>
+                    <option value="">Foreign key: none</option>
                     {tableNames.map((t) => <option key={t} value={t}>REFERENCES {t}</option>)}
                   </select>
                   {c.refTable && (
                     <>
                       <select className="inp" value={c.refColumn ?? ''} onChange={(e) => up(c.id, { refColumn: e.target.value })}>
-                        <option value="">참조 컬럼: 기본 키</option>
+                        <option value="">Referenced column: primary key</option>
                         {(tables.find((t) => t.name === c.refTable)?.columns ?? []).map((rc) => <option key={rc.name} value={rc.name}>{rc.name}</option>)}
                       </select>
                       <select className="inp" value={c.onDelete ?? ''} onChange={(e) => up(c.id, { onDelete: e.target.value })}>
-                        <option value="">삭제 시: 막기 (NO ACTION)</option><option value="CASCADE">삭제 시: CASCADE</option><option value="SET NULL">삭제 시: SET NULL</option>
-                        {d.id !== 'mssql' && <option value="RESTRICT">삭제 시: RESTRICT</option>}
+                        <option value="">On delete: block (NO ACTION)</option><option value="CASCADE">On delete: CASCADE</option><option value="SET NULL">On delete: SET NULL</option>
+                        {d.id !== 'mssql' && <option value="RESTRICT">On delete: RESTRICT</option>}
                       </select>
                     </>
                   )}
@@ -177,31 +177,31 @@ export function CreateTableModal({ tables, d = BANGDB, onClose, onCreate }: { ta
             </div>
           ))}
           <div className="row wrap" style={{ margin: '8px 0' }}>
-            <button className="btn sm" onClick={() => setCols((l) => [...l, { id: ++seq, name: '', decl: d.types.find((x) => /varchar|text/i.test(x.decl))?.decl ?? 'TEXT', open: false }])}>+ 컬럼</button>
-            <button className="btn sm ghost" onClick={() => setRawSql(preview || `CREATE TABLE ${d.qt(name || 'new_table')} (\n  ${d.q('id')} ${d.types[0].decl} PRIMARY KEY\n)`)}>SQL 직접 편집</button>
+            <button className="btn sm" onClick={() => setCols((l) => [...l, { id: ++seq, name: '', decl: d.types.find((x) => /varchar|text/i.test(x.decl))?.decl ?? 'TEXT', open: false }])}>+ Column</button>
+            <button className="btn sm ghost" onClick={() => setRawSql(preview || `CREATE TABLE ${d.qt(name || 'new_table')} (\n  ${d.q('id')} ${d.types[0].decl} PRIMARY KEY\n)`)}>Edit SQL directly</button>
           </div>
           <details className="adv">
-            <summary>테이블 제약 (복합 UNIQUE, CHECK){d.id !== 'mssql' ? ' · IF NOT EXISTS' : ''}</summary>
-            <Field label="UNIQUE (컬럼, 컬럼) — 한 줄에 하나"><textarea className="mono" rows={2} style={{ minHeight: 0 }} value={uniques} placeholder="dept_id, email" onChange={(e) => setUniques(e.target.value)} /></Field>
-            <Field label="CHECK 식 — 한 줄에 하나"><textarea className="mono" rows={2} style={{ minHeight: 0 }} value={checks} placeholder="start_at < end_at" onChange={(e) => setChecks(e.target.value)} /></Field>
+            <summary>Table constraints (composite UNIQUE, CHECK){d.id !== 'mssql' ? ' · IF NOT EXISTS' : ''}</summary>
+            <Field label="UNIQUE (column, column) — one per line"><textarea className="mono" rows={2} style={{ minHeight: 0 }} value={uniques} placeholder="dept_id, email" onChange={(e) => setUniques(e.target.value)} /></Field>
+            <Field label="CHECK expression — one per line"><textarea className="mono" rows={2} style={{ minHeight: 0 }} value={checks} placeholder="start_at < end_at" onChange={(e) => setChecks(e.target.value)} /></Field>
             {d.id !== 'mssql' && <label className="check"><input type="checkbox" checked={ifNotExists} onChange={(e) => setIfNotExists(e.target.checked)} /> IF NOT EXISTS</label>}
           </details>
-          <div className="muted small" style={{ marginBottom: 4 }}>미리보기</div>
+          <div className="muted small" style={{ marginBottom: 4 }}>Preview</div>
           <pre className="out">{err ? `-- ${err}` : preview}</pre>
         </>
       ) : (
         <Field label="CREATE TABLE SQL"><textarea className="mono" rows={12} value={rawSql} spellCheck={false} onChange={(e) => setRawSql(e.target.value)} /></Field>
       )}
       <div className="actions">
-        {rawSql !== null && <button className="btn ghost" onClick={() => setRawSql(null)}>빌더로 돌아가기</button>}
+        {rawSql !== null && <button className="btn ghost" onClick={() => setRawSql(null)}>Back to builder</button>}
         <span className="grow" />
-        <button className="btn" onClick={onClose}>취소</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
         <button className="btn primary" disabled={busy || (rawSql === null ? !!err : !rawSql.trim())} onClick={async () => {
           const sql = rawSql ?? preview;
           const n = rawSql !== null ? (/TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([`"[]?)([^`"\]\s(]+)/i.exec(rawSql)?.[2] ?? '') : name.trim();
           setBusy(true);
           try { if (await onCreate(sql, n)) onClose(); } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); }
-        }}>만들기</button>
+        }}>Create</button>
       </div>
     </Modal>
   );
@@ -221,22 +221,22 @@ export function AddColumnModal({ table, d = BANGDB, onClose, onAdd }: { table: s
   const col = { ...c, unique: unique && d.addColumn.unique };
   const sqls = c.name.trim() ? [addColumnSql(table, col, d), ...(unique && !d.addColumn.unique ? [createIndexSql(table, [c.name.trim()], { unique: true }, d)] : [])] : [];
   return (
-    <Modal title={`컬럼 추가 — ${table}`} onClose={onClose}>
+    <Modal title={`Add column — ${table}`} onClose={onClose}>
       <div className="grid2">
-        <Field label="컬럼 이름"><input className="mono" autoFocus value={c.name} onChange={(e) => up({ name: e.target.value })} /></Field>
-        <Field label="타입"><TypeSelect value={c.decl ?? ''} types={d.types} onChange={(v) => up({ decl: v })} /></Field>
-        <Field label="DEFAULT (선택)"><input className="mono" value={c.default ?? ''} placeholder="예: 0, 'none', CURRENT_TIMESTAMP" onChange={(e) => up({ default: e.target.value })} /></Field>
-        <Field label="정렬 규칙"><CollateInput d={d} value={c.collate ?? ''} onChange={(v) => up({ collate: v })} /></Field>
-        {d.addColumn.check && <Field label="CHECK (선택)"><input className="mono" value={c.check ?? ''} placeholder="예: qty >= 0" onChange={(e) => up({ check: e.target.value })} /></Field>}
-        {d.addColumn.references && <Field label="외래 키: 참조 테이블 (선택)"><input className="mono" value={c.refTable ?? ''} placeholder="예: dept" onChange={(e) => up({ refTable: e.target.value })} /></Field>}
+        <Field label="Column name"><input className="mono" autoFocus value={c.name} onChange={(e) => up({ name: e.target.value })} /></Field>
+        <Field label="Type"><TypeSelect value={c.decl ?? ''} types={d.types} onChange={(v) => up({ decl: v })} /></Field>
+        <Field label="DEFAULT (optional)"><input className="mono" value={c.default ?? ''} placeholder="e.g. 0, 'none', CURRENT_TIMESTAMP" onChange={(e) => up({ default: e.target.value })} /></Field>
+        <Field label="Collation"><CollateInput d={d} value={c.collate ?? ''} onChange={(v) => up({ collate: v })} /></Field>
+        {d.addColumn.check && <Field label="CHECK (optional)"><input className="mono" value={c.check ?? ''} placeholder="e.g. qty >= 0" onChange={(e) => up({ check: e.target.value })} /></Field>}
+        {d.addColumn.references && <Field label="Foreign key: referenced table (optional)"><input className="mono" value={c.refTable ?? ''} placeholder="e.g. dept" onChange={(e) => up({ refTable: e.target.value })} /></Field>}
       </div>
-      <label className="check"><input type="checkbox" checked={!!c.notNull} onChange={(e) => up({ notNull: e.target.checked })} /> NOT NULL {needDefault && <span className="warn small">— 기존 행을 채울 DEFAULT 가 필요합니다</span>}</label>
-      <label className="check"><input type="checkbox" checked={unique} onChange={(e) => setUnique(e.target.checked)} /> 값 중복 금지 {d.addColumn.unique ? '(UNIQUE)' : '(UNIQUE 인덱스 함께 생성)'}</label>
-      <p className="muted small">기존 행에는 DEFAULT 값(없으면 NULL)이 채워집니다.{d.id === 'bangdb' ? ' PRIMARY KEY · CHECK · 외래 키가 있는 컬럼은 ALTER 로 추가할 수 없어, 필요하면 새 테이블을 만들어 옮겨야 합니다.' : ''}</p>
+      <label className="check"><input type="checkbox" checked={!!c.notNull} onChange={(e) => up({ notNull: e.target.checked })} /> NOT NULL {needDefault && <span className="warn small">— a DEFAULT is required to fill existing rows</span>}</label>
+      <label className="check"><input type="checkbox" checked={unique} onChange={(e) => setUnique(e.target.checked)} /> No duplicate values {d.addColumn.unique ? '(UNIQUE)' : '(also creates a UNIQUE index)'}</label>
+      <p className="muted small">Existing rows are filled with the DEFAULT value (NULL if none).{d.id === 'bangdb' ? ' Columns with PRIMARY KEY, CHECK or a foreign key cannot be added with ALTER; if needed, create a new table and move the data.' : ''}</p>
       {sqls.length > 0 && <pre className="out">{sqls.join(';\n')};</pre>}
       <div className="actions">
-        <button className="btn" onClick={onClose}>취소</button>
-        <button className="btn primary" disabled={busy || !c.name.trim() || needDefault} onClick={async () => { setBusy(true); try { if (await onAdd(sqls)) onClose(); } finally { setBusy(false); } }}>추가</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn primary" disabled={busy || !c.name.trim() || needDefault} onClick={async () => { setBusy(true); try { if (await onAdd(sqls)) onClose(); } finally { setBusy(false); } }}>Add</button>
       </div>
     </Modal>
   );
@@ -249,17 +249,17 @@ export function AlterColumnModal({ table, col, d, onClose, onRun }: { table: str
   const up = (p: Partial<ColumnInfo>) => setC((x) => ({ ...x, ...p }));
   const sqls = d.alterColumn ? d.alterColumn(table, c, col) : [];
   return (
-    <Modal title={`컬럼 수정 — ${table}.${col.name}`} onClose={onClose}>
+    <Modal title={`Edit column — ${table}.${col.name}`} onClose={onClose}>
       <div className="grid2">
-        <Field label="타입"><TypeSelect value={c.decl ?? ''} types={d.types} onChange={(v) => up({ decl: v })} /></Field>
-        {d.id !== 'mssql' && <Field label="DEFAULT (비우면 제거)"><input className="mono" value={c.default ?? ''} onChange={(e) => up({ default: e.target.value })} /></Field>}
+        <Field label="Type"><TypeSelect value={c.decl ?? ''} types={d.types} onChange={(v) => up({ decl: v })} /></Field>
+        {d.id !== 'mssql' && <Field label="DEFAULT (empty removes it)"><input className="mono" value={c.default ?? ''} onChange={(e) => up({ default: e.target.value })} /></Field>}
       </div>
       <label className="check"><input type="checkbox" checked={!!c.notNull} onChange={(e) => up({ notNull: e.target.checked })} /> NOT NULL</label>
-      <p className="muted small">타입을 바꾸면 기존 값이 변환됩니다. 변환할 수 없는 값이 있으면 전체가 취소됩니다.{d.id === 'mysql' ? ' MySQL 은 컬럼 정의 전체를 다시 씁니다 (MODIFY COLUMN).' : ''}</p>
-      {sqls.length > 0 ? <pre className="out">{sqls.join(';\n')};</pre> : <p className="muted small">바뀐 것이 없습니다.</p>}
+      <p className="muted small">Changing the type converts existing values. If any value cannot be converted, the whole change is rolled back.{d.id === 'mysql' ? ' MySQL rewrites the entire column definition (MODIFY COLUMN).' : ''}</p>
+      {sqls.length > 0 ? <pre className="out">{sqls.join(';\n')};</pre> : <p className="muted small">Nothing has changed.</p>}
       <div className="actions">
-        <button className="btn" onClick={onClose}>취소</button>
-        <button className="btn primary" disabled={busy || !sqls.length} onClick={async () => { setBusy(true); try { if (await onRun(sqls)) onClose(); } finally { setBusy(false); } }}>적용</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn primary" disabled={busy || !sqls.length} onClick={async () => { setBusy(true); try { if (await onRun(sqls)) onClose(); } finally { setBusy(false); } }}>Apply</button>
       </div>
     </Modal>
   );
@@ -274,15 +274,15 @@ export function CreateViewModal({ initialName = '', initialSelect = '', replace,
   const [busy, setBusy] = useState(false);
   const sql = name.trim() && select.trim() ? (replace && d.replaceView ? d.replaceView(name.trim(), select.trim().replace(/;\s*$/, '')) : createViewSql(name.trim(), select, d)) : '';
   return (
-    <Modal title={replace ? `뷰 수정 — ${initialName}` : '뷰 만들기'} onClose={onClose} wide>
-      <Field label="뷰 이름"><input className="mono" value={name} disabled={replace} autoFocus={!replace} onChange={(e) => setName(e.target.value)} /></Field>
-      <Field label="SELECT 문"><textarea className="mono" rows={8} value={select} spellCheck={false} onChange={(e) => setSelect(e.target.value)} /></Field>
-      {replace && !d.replaceView && <p className="muted small">{d.label} 는 뷰 변경 문장이 없어 DROP VIEW 후 CREATE VIEW 를 한 트랜잭션으로 실행합니다.</p>}
+    <Modal title={replace ? `Edit view — ${initialName}` : 'Create view'} onClose={onClose} wide>
+      <Field label="View name"><input className="mono" value={name} disabled={replace} autoFocus={!replace} onChange={(e) => setName(e.target.value)} /></Field>
+      <Field label="SELECT statement"><textarea className="mono" rows={8} value={select} spellCheck={false} onChange={(e) => setSelect(e.target.value)} /></Field>
+      {replace && !d.replaceView && <p className="muted small">{d.label} has no statement to alter a view, so DROP VIEW and CREATE VIEW run in one transaction.</p>}
       <div className="actions">
-        <button className="btn ghost" disabled={!select.trim()} onClick={() => onPreview(select)}>미리보기</button>
+        <button className="btn ghost" disabled={!select.trim()} onClick={() => onPreview(select)}>Preview</button>
         <span className="grow" />
-        <button className="btn" onClick={onClose}>취소</button>
-        <button className="btn primary" disabled={busy || !sql} onClick={async () => { setBusy(true); try { if (await onCreate(sql, name.trim())) onClose(); } finally { setBusy(false); } }}>{replace ? '저장' : '만들기'}</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn primary" disabled={busy || !sql} onClick={async () => { setBusy(true); try { if (await onCreate(sql, name.trim())) onClose(); } finally { setBusy(false); } }}>{replace ? 'Save' : 'Create'}</button>
       </div>
     </Modal>
   );
@@ -298,8 +298,8 @@ export function CreateIndexForm({ table, columns, d = BANGDB, onCreate }: { tabl
   const base = table.includes('.') ? table.slice(table.indexOf('.') + 1) : table;
   return (
     <div className="card">
-      <b>인덱스 만들기</b>
-      <div className="muted small" style={{ margin: '8px 0 6px' }}>컬럼을 순서대로 누르세요 (복합 인덱스는 앞 컬럼부터 사용됩니다)</div>
+      <b>Create index</b>
+      <div className="muted small" style={{ margin: '8px 0 6px' }}>Click columns in order (a composite index is used from its leading column)</div>
       <div className="chips" style={{ marginBottom: 10 }}>
         {columns.map((c) => {
           const i = picked.indexOf(c.name);
@@ -311,7 +311,7 @@ export function CreateIndexForm({ table, columns, d = BANGDB, onCreate }: { tabl
         })}
       </div>
       <div className="row wrap">
-        <input className="inp mono grow" placeholder={picked.length ? `이름 (기본: idx_${base}_${picked.join('_')})` : '인덱스 이름 (선택)'} value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="inp mono grow" placeholder={picked.length ? `Name (default: idx_${base}_${picked.join('_')})` : 'Index name (optional)'} value={name} onChange={(e) => setName(e.target.value)} />
         <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={unique} onChange={(e) => setUnique(e.target.checked)} /> UNIQUE</label>
         <button className="btn primary sm" disabled={busy || !sql} onClick={async () => {
           setBusy(true);

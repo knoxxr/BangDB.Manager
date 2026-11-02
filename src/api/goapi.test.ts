@@ -78,6 +78,6 @@ describe('Go adapter requests', () => {
     expect(lastBody()).toMatchObject({ sql: 'UPDATE "users" SET "name" = ? WHERE "id" = ?', args: ['new', 1] });
     await deleteRow(conn(), 'users', { id: 1, name: 'old' }, ['id']);
     expect(lastBody()).toMatchObject({ sql: 'DELETE FROM "users" WHERE "id" = ?', args: [1] });
-    expect(() => updateRow(conn(), 'users', { a: 1 }, { a: 2 }, [])).toThrow(/기본 키/);
+    expect(() => updateRow(conn(), 'users', { a: 1 }, { a: 2 }, [])).toThrow(/primary key/);
   });
 });

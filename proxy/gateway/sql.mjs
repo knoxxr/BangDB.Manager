@@ -434,7 +434,7 @@ function msDecl(r) {
 const SQLITE_ROOT = resolve(process.env.SQLITE_ROOT || join(process.cwd(), 'data'));
 const SQLITE_EXT = /\.(db|sqlite|sqlite3|db3)$/i;
 
-const outside = () => Object.assign(new Error(`SQLITE_ROOT(${SQLITE_ROOT}) 밖의 파일은 열 수 없습니다`), { status: 403 });
+const outside = () => Object.assign(new Error(`Files outside SQLITE_ROOT (${SQLITE_ROOT}) cannot be opened`), { status: 403 });
 const inside = (root, p) => p === root || p.startsWith(root + sep);
 
 /**
@@ -443,10 +443,10 @@ const inside = (root, p) => p === root || p.startsWith(root + sep);
  * points elsewhere is refused too. Only .db / .sqlite / .sqlite3 / .db3 names.
  */
 export function sqlitePath(file) {
-  if (!file) throw Object.assign(new Error('SQLite 파일 경로를 지정하세요'), { status: 400 });
+  if (!file) throw Object.assign(new Error('Specify a SQLite file path'), { status: 400 });
   if (file === ':memory:') return file;
   if (/^file:/i.test(file)) throw outside(); // URI filenames could name other files or options
-  if (!SQLITE_EXT.test(file)) throw Object.assign(new Error('SQLite 파일은 .db, .sqlite, .sqlite3, .db3 이름만 열 수 있습니다'), { status: 403 });
+  if (!SQLITE_EXT.test(file)) throw Object.assign(new Error('Only SQLite files named .db, .sqlite, .sqlite3 or .db3 can be opened'), { status: 403 });
   const p = resolve(SQLITE_ROOT, file);
   if (!inside(SQLITE_ROOT, p)) throw outside();
   mkdirSync(SQLITE_ROOT, { recursive: true });
@@ -464,7 +464,7 @@ const existingParent = (d) => { let x = d; while (!existsSync(x) && dirname(x) !
  */
 const SQLITE_FILE_STMT = /^\s*(ATTACH|DETACH)\b|\bVACUUM\b[\s\S]*\bINTO\b/i;
 export function checkSqliteStatement(sql) {
-  for (const s of splitStatements(sql)) if (SQLITE_FILE_STMT.test(s)) throw Object.assign(new Error('ATTACH / DETACH / VACUUM INTO 는 게이트웨이에서 허용하지 않습니다'), { status: 403 });
+  for (const s of splitStatements(sql)) if (SQLITE_FILE_STMT.test(s)) throw Object.assign(new Error('ATTACH / DETACH / VACUUM INTO are not allowed through the gateway'), { status: 403 });
 }
 export const sqliteRoot = () => SQLITE_ROOT;
 

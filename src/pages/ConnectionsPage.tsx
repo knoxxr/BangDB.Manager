@@ -38,18 +38,18 @@ export default function ConnectionsPage() {
 
   return (
     <>
-      <TopBar title="서버 연결" right={<button className="btn primary" onClick={() => setEditing({ conn: blank(), isNew: true })}>{Icons.plus}추가</button>} />
+      <TopBar title="Connections" right={<button className="btn primary" onClick={() => setEditing({ conn: blank(), isNew: true })}>{Icons.plus}Add</button>} />
       {connections.length === 0 && (
         <>
-          <EmptyState icon={Icons.server} title="아직 등록된 서버가 없습니다"
-            action={<button className="btn primary" onClick={() => setEditing({ conn: blank(), isNew: true })}>{Icons.plus}첫 서버 추가</button>}>
-            종류를 고르고 주소와 계정을 입력하면 테이블, 데이터, SQL 을 이 화면에서 바로 다룰 수 있습니다.
+          <EmptyState icon={Icons.server} title="No servers yet"
+            action={<button className="btn primary" onClick={() => setEditing({ conn: blank(), isNew: true })}>{Icons.plus}Add your first server</button>}>
+            Pick a server type, enter its address and credentials, and you can work with tables, data and SQL right here.
           </EmptyState>
           <div className="guide">
-            <div className="g"><b><KindBadge kind="go" small />BangDB (Go)</b>knoxxr/bangdb 를 <code>bangdb -http :18081 -password …</code> 로 실행하면 프록시 없이 바로 연결됩니다.</div>
-            <div className="g"><b><KindBadge kind="postgres" small />PostgreSQL · MySQL · SQL Server · SQLite</b>이 앱을 띄운 서버의 DB 게이트웨이를 거쳐 접속합니다. 데스크톱 앱은 게이트웨이를 내장하고 있습니다.</div>
-            <div className="g"><b><KindBadge kind="mongodb" small />MongoDB · Redis</b>컬렉션·문서와 키 브라우저 전용 화면을 제공합니다. 역시 게이트웨이를 거칩니다.</div>
-            <div className="g"><b><KindBadge kind="rest" small />BangDB 2.0 REST</b>bangdb.com 서버의 18080 포트. 브라우저에서 CORS 오류가 나면 "프록시 경유"를 켜세요.</div>
+            <div className="g"><b><KindBadge kind="go" small />BangDB (Go)</b>Run knoxxr/bangdb with <code>bangdb -http :18081 -password …</code> and it connects directly, no proxy needed.</div>
+            <div className="g"><b><KindBadge kind="postgres" small />PostgreSQL · MySQL · SQL Server · SQLite</b>Connects through the DB gateway on the server that hosts this app. The desktop app has the gateway built in.</div>
+            <div className="g"><b><KindBadge kind="mongodb" small />MongoDB · Redis</b>Dedicated collection/document and key browser views. Also goes through the gateway.</div>
+            <div className="g"><b><KindBadge kind="rest" small />BangDB 2.0 REST</b>Port 18080 of a bangdb.com server. If the browser reports a CORS error, turn on "Via proxy".</div>
           </div>
         </>
       )}
@@ -58,19 +58,19 @@ export default function ConnectionsPage() {
           <div key={c.id} className="conn" onClick={() => nav(`/c/${c.id}/dbs`)} role="link" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && nav(`/c/${c.id}/dbs`)}>
             <KindBadge kind={c.kind} />
             <div className="meta">
-              <div className="title"><span className={`dot ${status[c.id] ?? ''}`} title={status[c.id] === 'ok' ? '연결됨' : status[c.id] === 'err' ? '연결 안 됨' : '확인 중'} /><span className="name">{c.name}</span></div>
+              <div className="title"><span className={`dot ${status[c.id] ?? ''}`} title={status[c.id] === 'ok' ? 'Connected' : status[c.id] === 'err' ? 'Unreachable' : 'Checking'} /><span className="name">{c.name}</span></div>
               <div className="sub">{connTarget(c)}</div>
               <div className="tags">
                 <span className="badge">{kindLabel(c.kind)}</span>
-                {c.kind === 'rest' && <span className="badge">DB {c.databases.length}개</span>}
+                {c.kind === 'rest' && <span className="badge">{c.databases.length} DBs</span>}
                 {!c.db && <span className="badge">{authLabel(c.auth.mode)}</span>}
-                {c.useProxy && <span className="badge accent">프록시</span>}
-                {status[c.id] === 'err' && <span className="badge err">연결 안 됨</span>}
+                {c.useProxy && <span className="badge accent">Proxy</span>}
+                {status[c.id] === 'err' && <span className="badge err">Unreachable</span>}
               </div>
             </div>
             <div className="acts" onClick={(e) => e.stopPropagation()}>
-              <button className="btn ghost icon sm" title="편집" aria-label="편집" onClick={() => setEditing({ conn: c, isNew: false })}>{Icons.edit}</button>
-              <button className="btn ghost icon sm danger" title="삭제" aria-label="삭제" onClick={async () => { if (await confirm(`"${c.name}" 연결을 삭제할까요? (서버 데이터는 삭제되지 않습니다)`)) { store.removeConnection(c.id); toast('연결 삭제됨'); } }}>{Icons.trash}</button>
+              <button className="btn ghost icon sm" title="Edit" aria-label="Edit" onClick={() => setEditing({ conn: c, isNew: false })}>{Icons.edit}</button>
+              <button className="btn ghost icon sm danger" title="Delete" aria-label="Delete" onClick={async () => { if (await confirm(`Delete the connection "${c.name}"? (Server data is not deleted)`)) { store.removeConnection(c.id); toast('Connection deleted'); } }}>{Icons.trash}</button>
             </div>
             <span className="chev">{Icons.chevron}</span>
           </div>
@@ -81,7 +81,7 @@ export default function ConnectionsPage() {
           initial={editing.conn}
           isNew={editing.isNew}
           onClose={() => setEditing(null)}
-          onSave={(c) => { store.upsertConnection(c); setEditing(null); toast('저장됨', 'ok'); }}
+          onSave={(c) => { store.upsertConnection(c); setEditing(null); toast('Saved', 'ok'); }}
         />
       )}
       {confirmEl}
@@ -101,9 +101,9 @@ export function connTarget(c: Connection): string {
   if (!c.db) return c.baseUrl;
   const d = c.db;
   const where = d.uri ? d.uri.replace(/\/\/[^@/]*@/, '//***@') : c.kind === 'sqlite' ? d.file ?? '' : `${d.host || '127.0.0.1'}:${d.port || DEFAULT_PORT[c.kind] || ''}${d.database ? `/${d.database}` : ''}`;
-  return `${where} · 게이트웨이 ${c.baseUrl || '(이 앱 서버)'}`;
+  return `${where} · gateway ${c.baseUrl || '(this app server)'}`;
 }
-const authLabel = (m: AuthMode) => ({ none: '없음', apikey: 'API 키', basic: 'Basic', login: '로그인' }[m]);
+const authLabel = (m: AuthMode) => ({ none: 'None', apikey: 'API key', basic: 'Basic', login: 'Login' }[m]);
 
 function ConnectionForm({ initial, isNew, onClose, onSave }: { initial: Connection; isNew: boolean; onClose: () => void; onSave: (c: Connection) => void }) {
   const [c, setC] = useState<Connection>(initial);
@@ -115,9 +115,9 @@ function ConnectionForm({ initial, isNew, onClose, onSave }: { initial: Connecti
 
   async function doLogin(conn: Connection): Promise<Connection> {
     const r = await login(conn);
-    if (!r.ok) throw new Error(`로그인 실패: ${describeResult(r)}`);
+    if (!r.ok) throw new Error(`Login failed: ${describeResult(r)}`);
     const token = extractToken(r.data, conn.auth.tokenField);
-    if (!token) throw new Error(`로그인 응답에 "${conn.auth.tokenField}" 필드가 없습니다`);
+    if (!token) throw new Error(`The login response has no "${conn.auth.tokenField}" field`);
     return { ...conn, auth: { ...conn.auth, token } };
   }
 
@@ -127,18 +127,18 @@ function ConnectionForm({ initial, isNew, onClose, onSave }: { initial: Connecti
       let conn = normalize(c);
       if (conn.db) {
         const h = await gw<{ ok: boolean; version?: string }>(conn, 'health');
-        if (h.ok) setTestMsg(`연결 성공: ${h.data.version ?? kindLabel(conn.kind)} (${h.durationMs}ms)`);
-        else setTestMsg(`실패: ${errorText(h)}${h.status === 0 || h.status === 404 ? ' — 게이트웨이에 닿지 못했습니다. 이 앱을 proxy/server.mjs 나 npm run dev 로 띄웠는지, 게이트웨이 주소가 맞는지 확인하세요.' : ''}`);
+        if (h.ok) setTestMsg(`Connected: ${h.data.version ?? kindLabel(conn.kind)} (${h.durationMs}ms)`);
+        else setTestMsg(`Failed: ${errorText(h)}${h.status === 0 || h.status === 404 ? ' — could not reach the gateway. Check that this app was started with proxy/server.mjs or npm run dev, and that the gateway URL is correct.' : ''}`);
         return;
       }
       if (conn.auth.mode === 'login') { conn = await doLogin(conn); setC(conn); }
       if (conn.kind === 'go') {
         const h = await goHealth(conn);
-        if (!h.ok) { setTestMsg(`실패: ${describeResult(h)} — bangdb 를 -http 옵션으로 실행했는지, 주소/포트가 맞는지 확인하세요.`); return; }
+        if (!h.ok) { setTestMsg(`Failed: ${describeResult(h)} — check that bangdb was started with the -http option and that the address/port is correct.`); return; }
       }
       const r = await ping(conn, conn.defaultDb);
-      if (r.ok) setTestMsg(`연결 성공: 테이블 ${extractTables(r.data).length}개 (${r.durationMs}ms)`);
-      else setTestMsg(`실패: ${describeResult(r)}${r.status === 0 && !conn.useProxy ? ' — 브라우저라면 CORS 또는 네트워크 문제일 수 있습니다. "프록시 경유"를 켜보세요.' : ''}`);
+      if (r.ok) setTestMsg(`Connected: ${extractTables(r.data).length} tables (${r.durationMs}ms)`);
+      else setTestMsg(`Failed: ${describeResult(r)}${r.status === 0 && !conn.useProxy ? ' — in a browser this may be a CORS or network problem. Try turning on "Via proxy".' : ''}`);
     } catch (e) {
       setTestMsg(e instanceof Error ? e.message : String(e));
     } finally { setTesting(false); }
@@ -147,15 +147,15 @@ function ConnectionForm({ initial, isNew, onClose, onSave }: { initial: Connecti
   async function save() {
     if (isGatewayKind(c.kind)) {
       const d = c.db ?? {};
-      if (c.kind === 'sqlite' ? !d.file?.trim() : !(d.uri?.trim() || d.host?.trim())) { toast(c.kind === 'sqlite' ? 'SQLite 파일을 지정하세요' : '호스트나 연결 문자열을 입력하세요', 'err'); return; }
-    } else if (!c.baseUrl.trim()) { toast('서버 URL을 입력하세요', 'err'); return; }
+      if (c.kind === 'sqlite' ? !d.file?.trim() : !(d.uri?.trim() || d.host?.trim())) { toast(c.kind === 'sqlite' ? 'Specify the SQLite file' : 'Enter a host or a connection string', 'err'); return; }
+    } else if (!c.baseUrl.trim()) { toast('Enter the server URL', 'err'); return; }
     onSave(normalize(c));
   }
   const gateway = isGatewayKind(c.kind);
 
   return (
-    <Modal title={isNew ? '서버 연결 추가' : '연결 편집'} onClose={onClose}>
-      <Field label="서버 종류">
+    <Modal title={isNew ? 'Add connection' : 'Edit connection'} onClose={onClose}>
+      <Field label="Server type">
         <select value={c.kind} onChange={(e) => {
           const kind = e.target.value as ServerKind;
           if (isGatewayKind(kind)) {
@@ -167,70 +167,70 @@ function ConnectionForm({ initial, isNew, onClose, onSave }: { initial: Connecti
           if (kind === 'go') upAuth({ mode: 'basic' });
         }}>
           <optgroup label="BangDB">
-            <option value="go">BangDB (Go) HTTP API — bangdb -http (포트 18081)</option>
-            <option value="rest">BangDB 2.0 REST — bangdb.com 서버 (포트 18080)</option>
+            <option value="go">BangDB (Go) HTTP API — bangdb -http (port 18081)</option>
+            <option value="rest">BangDB 2.0 REST — bangdb.com server (port 18080)</option>
           </optgroup>
-          <optgroup label="관계형 DB (게이트웨이 경유)">
+          <optgroup label="Relational DB (via gateway)">
             <option value="postgres">PostgreSQL</option>
             <option value="mysql">MySQL / MariaDB</option>
             <option value="mssql">Microsoft SQL Server</option>
-            <option value="sqlite">SQLite (게이트웨이 PC 의 파일)</option>
+            <option value="sqlite">SQLite (file on the gateway PC)</option>
           </optgroup>
-          <optgroup label="NoSQL (게이트웨이 경유)">
+          <optgroup label="NoSQL (via gateway)">
             <option value="mongodb">MongoDB</option>
             <option value="redis">Redis</option>
           </optgroup>
         </select>
       </Field>
-      <Field label="이름"><input value={c.name} onChange={(e) => up({ name: e.target.value })} placeholder={gateway ? `예: 운영 ${kindLabel(c.kind)}` : '예: 사내 BangDB'} /></Field>
+      <Field label="Name"><input value={c.name} onChange={(e) => up({ name: e.target.value })} placeholder={gateway ? `e.g. Production ${kindLabel(c.kind)}` : 'e.g. Office BangDB'} /></Field>
       {gateway && <GatewayFields c={c} up={up} />}
-      {!gateway && <><Field label={c.kind === 'go' ? '서버 URL (bangdb -http 주소, 기본 포트 18081)' : '서버 URL (REST 포트 기본 18080)'}><input className="mono" value={c.baseUrl} inputMode="url" onChange={(e) => up({ baseUrl: e.target.value })} placeholder={c.kind === 'go' ? 'http://192.168.0.10:18081' : 'http://192.168.0.10:18080'} /></Field>
-      {c.kind === 'rest' && <Field label="기본 DB 이름 (bangdb.config의 BANGDB_DATABASE_NAME)"><input className="mono" value={c.defaultDb} onChange={(e) => up({ defaultDb: e.target.value })} placeholder="mydb" /></Field>}
+      {!gateway && <><Field label={c.kind === 'go' ? 'Server URL (bangdb -http address, default port 18081)' : 'Server URL (REST port, default 18080)'}><input className="mono" value={c.baseUrl} inputMode="url" onChange={(e) => up({ baseUrl: e.target.value })} placeholder={c.kind === 'go' ? 'http://192.168.0.10:18081' : 'http://192.168.0.10:18080'} /></Field>
+      {c.kind === 'rest' && <Field label="Default database (BANGDB_DATABASE_NAME in bangdb.config)"><input className="mono" value={c.defaultDb} onChange={(e) => up({ defaultDb: e.target.value })} placeholder="mydb" /></Field>}
       {c.kind === 'go' && (
-        <Field label="비밀번호 (bangdb -password 값, 없으면 비워 둠)">
+        <Field label="Password (the bangdb -password value; leave empty if none)">
           <input type="password" autoComplete="current-password" value={c.auth.pass ?? ''} onChange={(e) => upAuth({ mode: 'basic', user: c.auth.user || 'app', pass: e.target.value })} />
         </Field>
       )}
-      {c.kind === 'rest' && <Field label="인증 방식">
+      {c.kind === 'rest' && <Field label="Authentication">
         <select value={c.auth.mode} onChange={(e) => upAuth({ mode: e.target.value as AuthMode })}>
-          <option value="none">없음</option>
-          <option value="apikey">API 키 헤더</option>
-          <option value="login">로그인 (user/pass → 토큰)</option>
+          <option value="none">None</option>
+          <option value="apikey">API key header</option>
+          <option value="login">Login (user/password → token)</option>
           <option value="basic">HTTP Basic</option>
         </select>
       </Field>}
       {c.kind === 'rest' && c.auth.mode === 'apikey' && (
         <div className="grid2">
-          <Field label="헤더 이름"><input className="mono" value={c.auth.headerName} onChange={(e) => upAuth({ headerName: e.target.value })} /></Field>
-          <Field label="API 키"><input className="mono" type="password" value={c.auth.apiKey ?? ''} onChange={(e) => upAuth({ apiKey: e.target.value })} /></Field>
+          <Field label="Header name"><input className="mono" value={c.auth.headerName} onChange={(e) => upAuth({ headerName: e.target.value })} /></Field>
+          <Field label="API key"><input className="mono" type="password" value={c.auth.apiKey ?? ''} onChange={(e) => upAuth({ apiKey: e.target.value })} /></Field>
         </div>
       )}
       {c.kind === 'rest' && (c.auth.mode === 'login' || c.auth.mode === 'basic') && (
         <div className="grid2">
-          <Field label="사용자"><input value={c.auth.user ?? ''} autoComplete="username" onChange={(e) => upAuth({ user: e.target.value })} /></Field>
-          <Field label="비밀번호"><input type="password" autoComplete="current-password" value={c.auth.pass ?? ''} onChange={(e) => upAuth({ pass: e.target.value })} /></Field>
+          <Field label="User"><input value={c.auth.user ?? ''} autoComplete="username" onChange={(e) => upAuth({ user: e.target.value })} /></Field>
+          <Field label="Password"><input type="password" autoComplete="current-password" value={c.auth.pass ?? ''} onChange={(e) => upAuth({ pass: e.target.value })} /></Field>
         </div>
       )}
       {c.kind === 'rest' && c.auth.mode === 'login' && (
         <div className="grid2">
-          <Field label="토큰 헤더 이름"><input className="mono" value={c.auth.headerName} onChange={(e) => upAuth({ headerName: e.target.value })} /></Field>
-          <Field label="응답의 토큰 필드"><input className="mono" value={c.auth.tokenField} onChange={(e) => upAuth({ tokenField: e.target.value })} /></Field>
+          <Field label="Token header name"><input className="mono" value={c.auth.headerName} onChange={(e) => upAuth({ headerName: e.target.value })} /></Field>
+          <Field label="Token field in response"><input className="mono" value={c.auth.tokenField} onChange={(e) => upAuth({ tokenField: e.target.value })} /></Field>
         </div>
       )}
-      <label className="check"><input type="checkbox" checked={c.useProxy} onChange={(e) => up({ useProxy: e.target.checked })} /> 프록시 경유 (앱과 같은 호스트의 /bangdb 로 요청, CORS 회피{isElectron ? ' · 데스크톱 앱에 내장됨' : ''})</label>
+      <label className="check"><input type="checkbox" checked={c.useProxy} onChange={(e) => up({ useProxy: e.target.checked })} /> Via proxy (requests go to /bangdb on the app's host, avoids CORS{isElectron ? ' · built into the desktop app' : ''})</label>
       </>}
 
       {!gateway && <details className="adv">
-        <summary>고급: REST 엔드포인트 템플릿 재정의</summary>
-        <p className="muted small">{c.kind === 'go' ? 'knoxxr/bangdb HTTP API 경로입니다. 서버 버전이 다르면 여기서 바꾸세요.' : 'BangDB 문서로 확인된 항목은 ✔, 나머지는 관례에 따른 추정값입니다. 서버 버전이 다르면 여기서 경로/메서드를 바꾸세요.'}</p>
+        <summary>Advanced: override REST endpoint templates</summary>
+        <p className="muted small">{c.kind === 'go' ? 'knoxxr/bangdb HTTP API paths. Change them here if your server version differs.' : 'Entries verified against the BangDB docs are marked ✔; the rest are unverified guesses based on convention. Change the path/method here if your server version differs.'}</p>
         {(c.kind === 'go' ? GO_KEYS : REST_KEYS).map((k) => <EndpointRow key={k} k={k} value={c.endpointOverrides[k]} onChange={(v) => up({ endpointOverrides: { ...c.endpointOverrides, [k]: v } })} />)}
       </details>}
 
-      {testMsg && <p className={`small ${testMsg.startsWith('연결 성공') ? 'ok' : 'danger'}`}>{testMsg}</p>}
+      {testMsg && <p className={`small ${testMsg.startsWith('Connected') ? 'ok' : 'danger'}`}>{testMsg}</p>}
       <div className="actions">
-        <button className="btn" onClick={test} disabled={testing}>{testing ? '테스트 중…' : '연결 테스트'}</button>
-        <button className="btn" onClick={onClose}>취소</button>
-        <button className="btn primary" onClick={save}>저장</button>
+        <button className="btn" onClick={test} disabled={testing}>{testing ? 'Testing…' : 'Test connection'}</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn primary" onClick={save}>Save</button>
       </div>
     </Modal>
   );
@@ -248,56 +248,56 @@ function GatewayFields({ c, up }: { c: Connection; up: (p: Partial<Connection>) 
     mongodb: 'mongodb+srv://user:pass@cluster.example.net/?retryWrites=true', redis: 'redis://:pass@host:6379/0',
     mssql: 'Server=host,1433;Database=db;User Id=sa;Password=…;Encrypt=true'
   };
-  const dbHint: Partial<Record<ServerKind, string>> = { postgres: 'postgres', mysql: '(선택)', mssql: 'master', mongodb: 'test', redis: '0' };
+  const dbHint: Partial<Record<ServerKind, string>> = { postgres: 'postgres', mysql: '(optional)', mssql: 'master', mongodb: 'test', redis: '0' };
   return (
     <>
       {c.kind === 'sqlite' ? (
         <>
-          <Field label="SQLite 파일 (게이트웨이의 SQLITE_ROOT 기준 경로)">
+          <Field label="SQLite file (path relative to the gateway's SQLITE_ROOT)">
             <div className="row">
               <input className="mono grow" value={d.file ?? ''} placeholder="app.db" onChange={(e) => set({ file: e.target.value })} />
-              <button className="btn sm" onClick={async () => { const r = await gwSqliteFiles(normalize(c)); if (r.ok) setFiles(r.data); }}>찾기</button>
+              <button className="btn sm" onClick={async () => { const r = await gwSqliteFiles(normalize(c)); if (r.ok) setFiles(r.data); }}>Browse</button>
             </div>
           </Field>
           {files && (
             <div className="card" style={{ padding: 8 }}>
-              <div className="muted small">SQLITE_ROOT: <span className="mono">{files.root}</span> — 없는 파일 이름을 쓰면 새로 만듭니다</div>
+              <div className="muted small">SQLITE_ROOT: <span className="mono">{files.root}</span> — a file name that does not exist yet will be created</div>
               <div className="chips" style={{ marginTop: 6 }}>
                 {files.files.map((f) => <span key={f.file} className={`chip ${d.file === f.file ? 'on' : ''}`} onClick={() => set({ file: f.file })}>{f.file} <span className="muted">{fmtBytes(f.size)}</span></span>)}
-                {!files.files.length && <span className="muted small">.db / .sqlite 파일이 없습니다</span>}
+                {!files.files.length && <span className="muted small">No .db / .sqlite files</span>}
               </div>
             </div>
           )}
         </>
       ) : (
         <>
-          <label className="check"><input type="checkbox" checked={useUri} onChange={(e) => { setUseUri(e.target.checked); if (!e.target.checked) set({ uri: undefined }); }} /> 연결 문자열(URI)로 입력</label>
+          <label className="check"><input type="checkbox" checked={useUri} onChange={(e) => { setUseUri(e.target.checked); if (!e.target.checked) set({ uri: undefined }); }} /> Enter as a connection string (URI)</label>
           {useUri ? (
-            <Field label="연결 문자열"><input className="mono" value={d.uri ?? ''} placeholder={uriHint[c.kind]} onChange={(e) => set({ uri: e.target.value })} /></Field>
+            <Field label="Connection string"><input className="mono" value={d.uri ?? ''} placeholder={uriHint[c.kind]} onChange={(e) => set({ uri: e.target.value })} /></Field>
           ) : (
             <>
               <div className="grid2">
-                <Field label="호스트"><input className="mono" value={d.host ?? ''} placeholder="192.168.0.10" inputMode="url" onChange={(e) => set({ host: e.target.value })} /></Field>
-                <Field label="포트"><input className="mono" type="number" value={d.port ?? ''} placeholder={String(DEFAULT_PORT[c.kind] ?? '')} onChange={(e) => set({ port: Number(e.target.value) || undefined })} /></Field>
-                <Field label={c.kind === 'redis' ? '사용자 (ACL, 없으면 비움)' : '사용자'}><input value={d.user ?? ''} autoComplete="username" onChange={(e) => set({ user: e.target.value })} /></Field>
-                <Field label="비밀번호"><input type="password" autoComplete="current-password" value={d.password ?? ''} onChange={(e) => set({ password: e.target.value })} /></Field>
-                <Field label={c.kind === 'redis' ? 'DB 번호 (0~15)' : '기본 데이터베이스'}>
+                <Field label="Host"><input className="mono" value={d.host ?? ''} placeholder="192.168.0.10" inputMode="url" onChange={(e) => set({ host: e.target.value })} /></Field>
+                <Field label="Port"><input className="mono" type="number" value={d.port ?? ''} placeholder={String(DEFAULT_PORT[c.kind] ?? '')} onChange={(e) => set({ port: Number(e.target.value) || undefined })} /></Field>
+                <Field label={c.kind === 'redis' ? 'User (ACL; leave empty if none)' : 'User'}><input value={d.user ?? ''} autoComplete="username" onChange={(e) => set({ user: e.target.value })} /></Field>
+                <Field label="Password"><input type="password" autoComplete="current-password" value={d.password ?? ''} onChange={(e) => set({ password: e.target.value })} /></Field>
+                <Field label={c.kind === 'redis' ? 'DB index (0–15)' : 'Default database'}>
                   <input className="mono" value={d.database ?? ''} placeholder={dbHint[c.kind]} onChange={(e) => set({ database: e.target.value })} />
                 </Field>
-                {c.kind === 'mongodb' && <Field label="authSource (선택)"><input className="mono" value={d.authSource ?? ''} placeholder="admin" onChange={(e) => set({ authSource: e.target.value })} /></Field>}
+                {c.kind === 'mongodb' && <Field label="authSource (optional)"><input className="mono" value={d.authSource ?? ''} placeholder="admin" onChange={(e) => set({ authSource: e.target.value })} /></Field>}
               </div>
-              <label className="check"><input type="checkbox" checked={!!d.ssl} onChange={(e) => set({ ssl: e.target.checked })} /> TLS/SSL 사용</label>
-              {d.ssl && <label className="check"><input type="checkbox" checked={!!d.sslInsecure} onChange={(e) => set({ sslInsecure: e.target.checked })} /> <span className="warn">인증서 검증 안 함</span> <span className="muted small">(자체 서명 인증서용. 중간자 공격에 노출됩니다)</span></label>}
+              <label className="check"><input type="checkbox" checked={!!d.ssl} onChange={(e) => set({ ssl: e.target.checked })} /> Use TLS/SSL</label>
+              {d.ssl && <label className="check"><input type="checkbox" checked={!!d.sslInsecure} onChange={(e) => set({ sslInsecure: e.target.checked })} /> <span className="warn">Skip TLS verification</span> <span className="muted small">(for self-signed certificates; exposes you to man-in-the-middle attacks)</span></label>}
             </>
           )}
         </>
       )}
       <details className="adv" open={native || !!c.baseUrl}>
-        <summary>게이트웨이 {c.baseUrl ? `— ${c.baseUrl}` : '— 이 앱을 서비스하는 서버'}</summary>
-        <p className="muted small">브라우저와 휴대폰은 DB 에 직접 접속할 수 없어서, DB 에 닿는 PC 에서 실행한 게이트웨이(<code>node proxy/server.mjs</code> 또는 <code>npm run dev</code>)를 거칩니다. {native ? '휴대폰 앱에서는 게이트웨이 주소를 꼭 입력하세요.' : '비워 두면 이 앱을 띄운 서버를 씁니다.'}</p>
+        <summary>Gateway {c.baseUrl ? `— ${c.baseUrl}` : '— the server hosting this app'}</summary>
+        <p className="muted small">Browsers and phones cannot connect to a database directly, so requests go through a gateway (<code>node proxy/server.mjs</code> or <code>npm run dev</code>) running on a PC that can reach the database. {native ? 'In the phone app the gateway URL is required.' : 'Leave empty to use the server that hosts this app.'}</p>
         <div className="grid2">
-          <Field label="게이트웨이 주소"><input className="mono" value={c.baseUrl} placeholder="http://192.168.0.5:8080" inputMode="url" onChange={(e) => up({ baseUrl: e.target.value })} /></Field>
-          <Field label="게이트웨이 토큰 (GATEWAY_TOKEN)"><input className="mono" type="password" value={c.gatewayToken ?? ''} onChange={(e) => up({ gatewayToken: e.target.value })} /></Field>
+          <Field label="Gateway URL"><input className="mono" value={c.baseUrl} placeholder="http://192.168.0.5:8080" inputMode="url" onChange={(e) => up({ baseUrl: e.target.value })} /></Field>
+          <Field label="Gateway token (GATEWAY_TOKEN)"><input className="mono" type="password" value={c.gatewayToken ?? ''} onChange={(e) => up({ gatewayToken: e.target.value })} /></Field>
         </div>
       </details>
     </>
@@ -317,7 +317,7 @@ function EndpointRow({ k, value, onChange }: { k: EndpointKey; value?: EndpointD
         {(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as HttpMethod[]).map((m) => <option key={m}>{m}</option>)}
       </select>
       <input className="mono grow" value={cur.path} onChange={(e) => onChange({ ...cur, path: e.target.value })} title={d.note} />
-      {value && <button className="btn sm ghost" onClick={() => onChange(undefined)} title="기본값으로">↺</button>}
+      {value && <button className="btn sm ghost" onClick={() => onChange(undefined)} title="Reset to default">↺</button>}
     </div>
   );
 }

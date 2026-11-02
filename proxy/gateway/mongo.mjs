@@ -57,7 +57,7 @@ export async function mongodb(conn) {
     async delete(b) {
       if (b.ids) { const r = await coll(b).deleteMany({ _id: { $in: b.ids.map(inp) } }); return { deleted: r.deletedCount }; }
       const filter = inp(b.filter);
-      if (!filter || !Object.keys(filter).length) { if (!b.all) throw Object.assign(new Error('조건 없이 모두 지우려면 all: true 가 필요합니다'), { status: 400 }); }
+      if (!filter || !Object.keys(filter).length) { if (!b.all) throw Object.assign(new Error('Deleting everything without a filter requires all: true'), { status: 400 }); }
       const r = await coll(b).deleteMany(filter ?? {});
       return { deleted: r.deletedCount };
     },

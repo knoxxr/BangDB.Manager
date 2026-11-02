@@ -31,7 +31,7 @@ setInterval(() => {
 
 async function adapterFor(conn) {
   const f = FACTORIES[conn?.kind];
-  if (!f) throw Object.assign(new Error(`지원하지 않는 종류: ${conn?.kind}`), { status: 400 });
+  if (!f) throw Object.assign(new Error(`Unsupported kind: ${conn?.kind}`), { status: 400 });
   checkHost(conn);
   const key = keyOf(conn);
   let p = pools.get(key);
@@ -62,25 +62,25 @@ async function handle(op, body) {
   const a = await adapterFor(conn);
   if (op.startsWith('mongo/') || op.startsWith('redis/')) {
     const fn = a.ops?.[op.split('/')[1]];
-    if (!fn) throw Object.assign(new Error(`알 수 없는 작업: ${op}`), { status: 404 });
+    if (!fn) throw Object.assign(new Error(`Unknown operation: ${op}`), { status: 404 });
     return fn(body);
   }
   if (!SQL_KINDS.has(conn.kind)) {
     if (op === 'health') return { ok: true, kind: conn.kind };
     if (op === 'databases') return { databases: await a.ops.databases(body) };
     if (op === 'stats') return a.ops.stats(body);
-    throw Object.assign(new Error(`${conn.kind} 에는 ${op} 가 없습니다`), { status: 404 });
+    throw Object.assign(new Error(`${conn.kind} has no ${op} operation`), { status: 404 });
   }
   switch (op) {
     case 'health': { const s = await a.stats(); return { ok: true, version: s.version }; }
     case 'tables': { const t = await a.tables(); return { tables: t, count: t.length }; }
     case 'table': {
       const [t] = await a.tables(body.table);
-      if (!t) throw Object.assign(new Error(`테이블이나 뷰가 없습니다: ${body.table}`), { status: 404, code: 'not_found' });
+      if (!t) throw Object.assign(new Error(`No such table or view: ${body.table}`), { status: 404, code: 'not_found' });
       return t;
     }
     case 'query': {
-      if (!String(body.sql ?? '').trim()) throw Object.assign(new Error('"sql" 이 필요합니다'), { status: 400 });
+      if (!String(body.sql ?? '').trim()) throw Object.assign(new Error('"sql" is required'), { status: 400 });
       const start = performance.now();
       const r = await a.query(body.sql, body.args, { mode: body.mode, limit: Math.min(Number(body.limit) || 1000, 100000) });
       return { ...r, ms: Math.round((performance.now() - start) * 1000) / 1000 };
@@ -89,7 +89,7 @@ async function handle(op, body) {
     case 'databases': return { databases: await a.databases() };
     case 'stats': return a.stats();
   }
-  throw Object.assign(new Error(`알 수 없는 작업: ${op}`), { status: 404 });
+  throw Object.assign(new Error(`Unknown operation: ${op}`), { status: 404 });
 }
 
 function sqliteFiles() {
@@ -135,7 +135,7 @@ const tokenOk = (sent) => {
  * drive it, and nobody on the network can).
  */
 function gate(req) {
-  if (TOKEN) return tokenOk(req.headers['x-gateway-token']) ? null : { status: 401, code: 'unauthorized', error: '게이트웨이 토큰이 맞지 않습니다' };
+  if (TOKEN) return tokenOk(req.headers['x-gateway-token']) ? null : { status: 401, code: 'unauthorized', error: 'Gateway token does not match' };
   const local = LOOPBACK.has(req.socket?.remoteAddress ?? '');
   // Host must be a loopback name too: a rebinding domain resolving to 127.0.0.1
   // would otherwise look like a same-origin page
@@ -145,7 +145,7 @@ function gate(req) {
   let sameOrigin = !origin;
   if (origin) { try { sameOrigin = new URL(origin).host.toLowerCase() === host.toLowerCase(); } catch { sameOrigin = false; } }
   if (local && hostOk && sameOrigin) return null;
-  return { status: 403, code: 'gateway_disabled', error: '이 게이트웨이는 GATEWAY_TOKEN 없이 이 PC 의 같은 주소에서 연 앱만 허용합니다. 다른 기기나 주소에서 쓰려면 서버를 GATEWAY_TOKEN=<비밀값> 으로 실행하고 연결 편집에 같은 토큰을 넣으세요.' };
+  return { status: 403, code: 'gateway_disabled', error: 'Without GATEWAY_TOKEN this gateway only accepts the app opened from the same address on this PC. To use it from another device or address, run the server with GATEWAY_TOKEN=<secret> and enter the same token when editing the connection.' };
 }
 
 /** GATEWAY_ALLOWED_HOSTS=db1.local,10.0.0.5 limits which database hosts the gateway connects to. */
@@ -154,10 +154,10 @@ function checkHost(conn) {
   if (!ALLOWED_HOSTS.length || conn.kind === 'sqlite') return;
   // connection strings can name other hosts in ways only each driver parses
   // (query parameters, multi-host lists, SRV records): refuse them outright
-  if (conn.uri) throw Object.assign(new Error('GATEWAY_ALLOWED_HOSTS 가 설정된 게이트웨이는 연결 문자열을 받지 않습니다. 호스트·포트 칸을 쓰세요.'), { status: 403, code: 'host_not_allowed' });
+  if (conn.uri) throw Object.assign(new Error('A gateway with GATEWAY_ALLOWED_HOSTS set does not accept connection strings. Use the host and port fields.'), { status: 403, code: 'host_not_allowed' });
   const host = conn.host || '127.0.0.1';
   if (!ALLOWED_HOSTS.includes(String(host).toLowerCase().replace(/^\[|\]$/g, ''))) {
-    throw Object.assign(new Error(`GATEWAY_ALLOWED_HOSTS 에 없는 호스트입니다: ${host}`), { status: 403, code: 'host_not_allowed' });
+    throw Object.assign(new Error(`Host is not in GATEWAY_ALLOWED_HOSTS: ${host}`), { status: 403, code: 'host_not_allowed' });
   }
 }
 
@@ -176,9 +176,9 @@ export async function handleGateway(req, res, cors = {}) {
   if (denied) { send(denied.status, { error: denied.error, code: denied.code }); return true; }
   const chunks = [];
   let size = 0;
-  for await (const c of req) { size += c.length; if (size > MAX_BODY) { send(413, { error: '요청이 너무 큽니다', code: 'too_large' }); return true; } chunks.push(c); }
+  for await (const c of req) { size += c.length; if (size > MAX_BODY) { send(413, { error: 'Request too large', code: 'too_large' }); return true; } chunks.push(c); }
   let body;
-  try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch (e) { send(400, { error: `잘못된 JSON: ${e.message}`, code: 'bad_request' }); return true; }
+  try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch (e) { send(400, { error: `Invalid JSON: ${e.message}`, code: 'bad_request' }); return true; }
   const op = url.slice(4).split('?')[0];
   try {
     send(200, await handle(op, body));

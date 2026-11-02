@@ -38,7 +38,7 @@ export default function GoTablesPage() {
   }, [conn]);
   useEffect(() => { load(); }, [load]);
 
-  if (!conn) return <div className="empty">연결을 찾을 수 없습니다.</div>;
+  if (!conn) return <div className="empty">Connection not found.</div>;
   const base = `/c/${conn.id}/db/${encodeURIComponent(db)}`;
   const shown = tables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()));
   const nT = tables.filter((t) => t.kind === 'table').length;
@@ -46,16 +46,16 @@ export default function GoTablesPage() {
   async function drop(t: GoTableInfo) {
     if (!conn) return;
     const view = t.kind === 'view';
-    if (!(await confirm(view ? `뷰 "${t.name}" 를 삭제합니다.` : `테이블 "${t.name}" 를 삭제(DROP)합니다. 데이터가 모두 사라집니다.`))) return;
+    if (!(await confirm(view ? `Drop view "${t.name}".` : `Drop table "${t.name}". All data will be lost.`))) return;
     const r = view ? await dropView(conn, t.name) : await dropTable(conn, t.name);
-    if (r.ok) { toast(`"${t.name}" 삭제됨`, 'ok'); load(); } else toast(`삭제 실패: ${errorText(r)}`, 'err');
+    if (r.ok) { toast(`"${t.name}" deleted`, 'ok'); load(); } else toast(`Delete failed: ${errorText(r)}`, 'err');
   }
 
   async function create(sql: string, name: string): Promise<boolean> {
     if (!conn) return false;
     const r = await goQuery(conn, sql, undefined, { mode: 'exec' });
-    if (!r.ok) { toast(`실패: ${errorText(r)}`, 'err'); return false; }
-    toast(`"${name}" 생성됨`, 'ok');
+    if (!r.ok) { toast(`Failed: ${errorText(r)}`, 'err'); return false; }
+    toast(`"${name}" created`, 'ok');
     await load();
     if (name) nav(`${base}/t/${encodeURIComponent(name)}`);
     return true;
@@ -63,23 +63,23 @@ export default function GoTablesPage() {
 
   return (
     <>
-      <TopBar title={conn.db && conn.kind !== 'sqlite' ? db : '테이블'} crumbs={[{ to: '/connections', label: '서버' }, { to: `/c/${conn.id}/dbs`, label: conn.name }]}
+      <TopBar title={conn.db && conn.kind !== 'sqlite' ? db : 'Tables'} crumbs={[{ to: '/connections', label: 'Servers' }, { to: `/c/${conn.id}/dbs`, label: conn.name }]}
         right={<>
           <button className="btn sm" onClick={() => nav(`${base}/query`)}>SQL</button>
-          <button className="btn sm" onClick={() => setCreating('view')}>+ 뷰</button>
-          <button className="btn primary sm" onClick={() => setCreating('table')}>+ 테이블</button>
+          <button className="btn sm" onClick={() => setCreating('view')}>+ View</button>
+          <button className="btn primary sm" onClick={() => setCreating('table')}>+ Table</button>
         </>} />
       <div className="toolbar">
-        <input className="inp filter" placeholder="테이블·뷰 검색" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <span className="muted small">테이블 {nT} · 뷰 {tables.length - nT}</span>
-        <button className="btn ghost icon sm" onClick={load} disabled={loading} title="새로고침" aria-label="새로고침">{loading ? <span className="spin" /> : Icons.refresh}</button>
+        <input className="inp filter" placeholder="Search tables and views" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <span className="muted small">{nT} tables · {tables.length - nT} views</span>
+        <button className="btn ghost icon sm" onClick={load} disabled={loading} title="Refresh" aria-label="Refresh">{loading ? <span className="spin" /> : Icons.refresh}</button>
       </div>
       {err && <div className="card danger">{err}</div>}
       {!err && !loading && tables.length === 0 && (
         <div className="card">
-          <p><b>테이블이 없습니다.</b></p>
-          <p className="muted small">"+ 테이블" 로 컬럼과 제약을 고르며 만들거나, 서버 화면의 "SQL 스크립트 실행" 으로 덤프를 복원하세요.</p>
-          <button className="btn primary" onClick={() => setCreating('table')}>+ 테이블 만들기</button>
+          <p><b>No tables.</b></p>
+          <p className="muted small">Create one with "+ Table" by choosing columns and constraints, or restore a dump with "Run SQL script" on the server page.</p>
+          <button className="btn primary" onClick={() => setCreating('table')}>+ Create table</button>
         </div>
       )}
       <div className="list">
@@ -88,28 +88,28 @@ export default function GoTablesPage() {
             <div className="grow" style={{ cursor: 'pointer' }} onClick={() => nav(`${base}/t/${encodeURIComponent(t.name)}`)}>
               <div className="title mono">
                 {t.name}
-                {t.kind === 'view' && <span className="badge accent" style={{ marginLeft: 8 }}>뷰</span>}
-                {t.store === 'memory' && <span className="badge accent" style={{ marginLeft: 8 }}>인메모리</span>}
-                {t.store === 'timeseries' && <span className="badge accent" style={{ marginLeft: 8 }}>시계열</span>}
+                {t.kind === 'view' && <span className="badge accent" style={{ marginLeft: 8 }}>View</span>}
+                {t.store === 'memory' && <span className="badge accent" style={{ marginLeft: 8 }}>In-memory</span>}
+                {t.store === 'timeseries' && <span className="badge accent" style={{ marginLeft: 8 }}>Time series</span>}
               </div>
               <div className="sub">
                 {t.kind === 'view'
                   ? viewSelect(t.sql ?? '').replace(/\s+/g, ' ').slice(0, 120)
-                  : `컬럼 ${t.columns?.length ?? 0} · 인덱스 ${(t.indexes ?? []).filter((i) => !i.auto).length} · ${counts[t.name] === undefined ? '…' : `${counts[t.name]!.toLocaleString()}행`} — ${(t.columns ?? []).map((c) => c.name).join(', ')}`}
+                  : `${t.columns?.length ?? 0} columns · ${(t.indexes ?? []).filter((i) => !i.auto).length} indexes · ${counts[t.name] === undefined ? '…' : `${counts[t.name]!.toLocaleString()} rows`} — ${(t.columns ?? []).map((c) => c.name).join(', ')}`}
               </div>
             </div>
-            <button className="btn ghost icon sm danger" onClick={() => drop(t)} title="삭제" aria-label="삭제">{Icons.trash}</button>
+            <button className="btn ghost icon sm danger" onClick={() => drop(t)} title="Delete" aria-label="Delete">{Icons.trash}</button>
             <span className="chev" onClick={() => nav(`${base}/t/${encodeURIComponent(t.name)}`)}>{Icons.chevron}</span>
           </div>
         ))}
       </div>
-      <button className="fab" onClick={() => setCreating('table')} aria-label="테이블 만들기">+</button>
+      <button className="fab" onClick={() => setCreating('table')} aria-label="Create table">+</button>
       {creating === 'table' && <CreateTableModal tables={tables} d={dialectOf(conn)} onClose={() => setCreating(null)} onCreate={create} />}
       {creating === 'view' && (
         <CreateViewModal d={dialectOf(conn)} onClose={() => setCreating(null)} onCreate={create}
           onPreview={async (s) => { const r = await goQuery(conn, s, undefined, { limit: 5 }); if (r.ok) setPreview(goRows(r.data)); else toast(errorText(r), 'err'); }} />
       )}
-      {preview && <Modal title="미리보기 (5행)" onClose={() => setPreview(null)} wide><DataTable rows={preview} /></Modal>}
+      {preview && <Modal title="Preview (5 rows)" onClose={() => setPreview(null)} wide><DataTable rows={preview} /></Modal>}
       {confirmEl}
     </>
   );

@@ -41,7 +41,7 @@ export function describeResult(r: ApiResult): string {
       : r.text.slice(0, 160);
     return `HTTP ${r.status} ${msg}`.trim();
   }
-  return `성공 (${r.status}, ${r.durationMs}ms)`;
+  return `OK (${r.status}, ${r.durationMs}ms)`;
 }
 
 // ---------- Modal ----------
@@ -54,7 +54,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className={`modal${wide ? ' wide' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
-        <button className="x" onClick={onClose} aria-label="닫기">{Icons.close}</button>
+        <button className="x" onClick={onClose} aria-label="Close">{Icons.close}</button>
         <h2>{title}</h2>
         {children}
       </div>
@@ -65,12 +65,12 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
 // ---------- Confirm ----------
 export function useConfirm() {
   const [req, setReq] = useState<{ text: string; ok: string; resolve: (v: boolean) => void } | null>(null);
-  const confirm = useCallback((text: string, ok = '삭제') => new Promise<boolean>((resolve) => setReq({ text, ok, resolve })), []);
+  const confirm = useCallback((text: string, ok = 'Delete') => new Promise<boolean>((resolve) => setReq({ text, ok, resolve })), []);
   const el = req ? (
-    <Modal title="확인" onClose={() => { req.resolve(false); setReq(null); }}>
+    <Modal title="Confirm" onClose={() => { req.resolve(false); setReq(null); }}>
       <p>{req.text}</p>
       <div className="actions">
-        <button className="btn" onClick={() => { req.resolve(false); setReq(null); }}>취소</button>
+        <button className="btn" onClick={() => { req.resolve(false); setReq(null); }}>Cancel</button>
         <button className="btn danger" autoFocus onClick={() => { req.resolve(true); setReq(null); }}>{req.ok}</button>
       </div>
     </Modal>
@@ -90,8 +90,8 @@ export function usePrompt() {
           onKeyDown={(e) => { if (e.key === 'Enter' && req.value.trim()) close(req.value.trim()); }} />
       </Field>
       <div className="actions">
-        <button className="btn" onClick={() => close(null)}>취소</button>
-        <button className="btn primary" disabled={!req.value.trim()} onClick={() => close(req.value.trim())}>확인</button>
+        <button className="btn" onClick={() => close(null)}>Cancel</button>
+        <button className="btn primary" disabled={!req.value.trim()} onClick={() => close(req.value.trim())}>OK</button>
       </div>
     </Modal>
   ) : null;
@@ -107,7 +107,7 @@ export function JsonOut({ value }: { value: unknown }) {
 export function ResultBadge({ r }: { r: ApiResult | null }) {
   if (!r) return null;
   const cls = r.error ? 'err' : r.ok ? 'ok' : 'warn';
-  return <span className={`badge ${cls}`}>{r.error ? '오류' : `HTTP ${r.status}`} · {r.durationMs}ms</span>;
+  return <span className={`badge ${cls}`}>{r.error ? 'Error' : `HTTP ${r.status}`} · {r.durationMs}ms</span>;
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -126,7 +126,7 @@ export function DataTable({ rows, onRowClick }: { rows: Record<string, unknown>[
     rows.forEach((r) => Object.keys(r).forEach((k) => s.add(k)));
     return Array.from(s);
   }, [rows]);
-  if (!rows.length) return <div className="empty">결과 없음</div>;
+  if (!rows.length) return <div className="empty">No results</div>;
   return (
     <div className="tablewrap">
       <table className="data">

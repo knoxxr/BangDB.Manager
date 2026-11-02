@@ -1,5 +1,5 @@
 // Desktop shell (Windows / Linux / macOS). It serves the built app from an
-// in-process copy of the proxy + database gateway, so "프록시 경유" works for
+// in-process copy of the proxy + database gateway, so "via proxy" works for
 // REST servers and PostgreSQL/MySQL/SQL Server/SQLite/MongoDB/Redis work
 // without any extra install, and it can open the same server on the LAN so
 // phones use the app without installing anything.
@@ -69,25 +69,25 @@ async function toggleLan(item) {
     showLanAddresses();
   } catch (e) {
     if (item) item.checked = false;
-    dialog.showErrorBox('휴대폰 접속 허용 실패', `포트 ${LAN_PORT} 을(를) 열 수 없습니다: ${e.message}`);
+    dialog.showErrorBox('Allow phone access failed', `Could not open port ${LAN_PORT}: ${e.message}`);
   }
 }
 
 function showLanAddresses() {
   if (!lan) {
-    dialog.showMessageBox(win, { type: 'info', message: '휴대폰 접속이 꺼져 있습니다', detail: '서버 메뉴에서 "휴대폰 접속 허용"을 켜세요.' });
+    dialog.showMessageBox(win, { type: 'info', message: 'Phone access is off', detail: 'Turn on "Allow phone access" in the Server menu.' });
     return;
   }
   const urls = lanAddresses().map((a) => `http://${a}:${lan.port}`);
   const detail = [
-    urls.length ? urls.join('\n') : `http://<이 PC 의 IP>:${lan.port}`,
+    urls.length ? urls.join('\n') : `http://<this PC's IP>:${lan.port}`,
     '',
-    '열린 뒤 "홈 화면에 추가"하면 앱처럼 쓸 수 있습니다. 방화벽이 ' + lan.port + ' 포트를 허용해야 합니다.',
-    gateway ? `PostgreSQL 등 게이트웨이 DB 를 휴대폰에서 쓰려면 연결 편집의 게이트웨이 토큰에 다음 값을 넣으세요:\n${TOKEN}` : ''
+    'Once open, use "Add to Home Screen" to use it like an app. The firewall must allow port ' + lan.port + '.',
+    gateway ? `To use gateway databases such as PostgreSQL from a phone, enter this value as the gateway token when editing the connection:\n${TOKEN}` : ''
   ].join('\n');
   dialog.showMessageBox(win, {
-    type: 'info', message: '같은 네트워크의 휴대폰 브라우저에서 여세요', detail,
-    buttons: ['주소 복사', '토큰 복사', '닫기'], defaultId: 0, cancelId: 2
+    type: 'info', message: 'Open in a phone browser on the same network', detail,
+    buttons: ['Copy address', 'Copy token', 'Close'], defaultId: 0, cancelId: 2
   }).then((r) => {
     if (r.response === 0 && urls.length) clipboard.writeText(urls[0]);
     if (r.response === 1) clipboard.writeText(TOKEN);
@@ -97,24 +97,24 @@ function showLanAddresses() {
 function buildMenu() {
   const template = [
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
-    { label: '파일', submenu: [{ role: 'quit', label: '종료' }] },
+    { label: 'File', submenu: [{ role: 'quit', label: 'Quit' }] },
     {
-      label: '서버',
+      label: 'Server',
       submenu: [
-        { id: 'lan', label: `휴대폰 접속 허용 (포트 ${LAN_PORT})`, type: 'checkbox', checked: !!lan, click: (item) => toggleLan(item) },
-        { label: '휴대폰 접속 주소·토큰 보기', click: showLanAddresses },
+        { id: 'lan', label: `Allow phone access (port ${LAN_PORT})`, type: 'checkbox', checked: !!lan, click: (item) => toggleLan(item) },
+        { label: 'Show phone access address & token', click: showLanAddresses },
         { type: 'separator' },
-        { label: gateway ? `DB 게이트웨이: 내장됨 (SQLite 폴더: ${process.env.SQLITE_ROOT})` : `DB 게이트웨이 없음: ${gatewayError}`, enabled: false }
+        { label: gateway ? `DB gateway: built in (SQLite folder: ${process.env.SQLITE_ROOT})` : `DB gateway unavailable: ${gatewayError}`, enabled: false }
       ]
     },
-    { label: '보기', submenu: [{ role: 'reload', label: '새로고침' }, { role: 'toggleDevTools', label: '개발자 도구' }, { type: 'separator' }, { role: 'resetZoom', label: '원래 크기' }, { role: 'zoomIn', label: '확대' }, { role: 'zoomOut', label: '축소' }, { type: 'separator' }, { role: 'togglefullscreen', label: '전체 화면' }] },
-    { label: '도움말', submenu: [
-      { label: '업데이트 확인', click: () => checkUpdates(true) },
+    { label: 'View', submenu: [{ role: 'reload', label: 'Refresh' }, { role: 'toggleDevTools', label: 'Developer tools' }, { type: 'separator' }, { role: 'resetZoom', label: 'Actual size' }, { role: 'zoomIn', label: 'Zoom in' }, { role: 'zoomOut', label: 'Zoom out' }, { type: 'separator' }, { role: 'togglefullscreen', label: 'Full screen' }] },
+    { label: 'Help', submenu: [
+      { label: 'Check for updates', click: () => checkUpdates(true) },
       { label: statusLabel(), enabled: false },
       { type: 'separator' },
-      { label: 'GitHub 저장소', click: () => shell.openExternal('https://github.com/knoxxr/BangDB.Manager') },
-      { label: '릴리즈 노트', click: () => shell.openExternal('https://github.com/knoxxr/BangDB.Manager/releases') },
-      { label: `버전 ${app.getVersion()}`, enabled: false }
+      { label: 'GitHub repository', click: () => shell.openExternal('https://github.com/knoxxr/BangDB.Manager') },
+      { label: 'Release notes', click: () => shell.openExternal('https://github.com/knoxxr/BangDB.Manager/releases') },
+      { label: `Version ${app.getVersion()}`, enabled: false }
     ] }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -137,7 +137,7 @@ app.whenReady().then(async () => {
   try {
     await startLocal();
   } catch (e) {
-    dialog.showErrorBox('시작 실패', `내부 서버를 열 수 없습니다: ${e.message}`);
+    dialog.showErrorBox('Startup failed', `Could not start the internal server: ${e.message}`);
     app.quit();
     return;
   }

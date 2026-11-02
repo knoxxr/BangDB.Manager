@@ -30,7 +30,7 @@ export function downloadFor(rel: Release, platform: string): string {
 
 /**
  * Shows a bar when a newer version is ready:
- *  - web / PWA: the service worker fetched a new build → "새로고침" applies it
+ *  - web / PWA: the service worker fetched a new build → "Reload" applies it
  *  - Android / iOS app: the newest GitHub release is newer than this build → download link
  *  - desktop app: nothing here, electron-updater handles it in the main process
  */
@@ -71,9 +71,9 @@ export default function UpdateBanner() {
     return (
       <div className="updatebar" role="status">
         {Icons.refresh}
-        <span className="grow">새 버전이 준비되었습니다.</span>
-        <button className="btn sm ghost" onClick={() => setNeedRefresh(false)}>나중에</button>
-        <button className="btn sm primary" disabled={busy} onClick={() => { setBusy(true); updateServiceWorker(true); }}>{busy ? '적용 중…' : '새로고침'}</button>
+        <span className="grow">A new version is ready.</span>
+        <button className="btn sm ghost" onClick={() => setNeedRefresh(false)}>Later</button>
+        <button className="btn sm primary" disabled={busy} onClick={() => { setBusy(true); updateServiceWorker(true); }}>{busy ? 'Applying…' : 'Reload'}</button>
       </div>
     );
   }
@@ -81,9 +81,9 @@ export default function UpdateBanner() {
     return (
       <div className="updatebar" role="status">
         {Icons.refresh}
-        <span className="grow">새 버전 {release.version} 이(가) 있습니다 (현재 {__APP_VERSION__}).</span>
-        <button className="btn sm ghost" onClick={() => { try { localStorage.setItem(SKIP_KEY, release.version); } catch { /* ignore */ } setRelease(null); }}>건너뛰기</button>
-        <a className="btn sm primary" href={release.url} target="_blank" rel="noopener">다운로드</a>
+        <span className="grow">Version {release.version} is available (you have {__APP_VERSION__}).</span>
+        <button className="btn sm ghost" onClick={() => { try { localStorage.setItem(SKIP_KEY, release.version); } catch { /* ignore */ } setRelease(null); }}>Skip</button>
+        <a className="btn sm primary" href={release.url} target="_blank" rel="noopener">Download</a>
       </div>
     );
   }

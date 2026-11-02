@@ -31,48 +31,48 @@ export default function TablesPage() {
   }, [conn, db]);
   useEffect(() => { load(); }, [load]);
 
-  if (!conn) return <div className="empty">연결을 찾을 수 없습니다.</div>;
+  if (!conn) return <div className="empty">Connection not found.</div>;
 
   const shown = tables.filter((t) => (showSys || !isSystemTable(t)) && t.toLowerCase().includes(filter.toLowerCase()));
 
   async function drop(t: string) {
     if (!conn) return;
-    if (!(await confirm(`테이블 "${t}" 를 삭제합니다. 데이터가 모두 사라집니다.`))) return;
+    if (!(await confirm(`Delete table "${t}"? All of its data will be lost.`))) return;
     const r = await dropTable(conn, db, t);
-    if (r.ok) { toast(`"${t}" 삭제됨`, 'ok'); load(); } else toast(`삭제 실패: ${describeResult(r)}`, 'err');
+    if (r.ok) { toast(`"${t}" deleted`, 'ok'); load(); } else toast(`Delete failed: ${describeResult(r)}`, 'err');
   }
 
   return (
     <>
-      <TopBar title={db} crumbs={[{ to: '/connections', label: '서버' }, { to: `/c/${conn.id}/dbs`, label: conn.name }, { label: 'DB' }]}
-        right={<><button className="btn sm" onClick={() => nav(`/c/${conn.id}/db/${encodeURIComponent(db)}/query`)}>SQL</button><button className="btn primary sm" onClick={() => setCreating(true)}>+ 테이블</button></>} />
+      <TopBar title={db} crumbs={[{ to: '/connections', label: 'Servers' }, { to: `/c/${conn.id}/dbs`, label: conn.name }, { label: 'DB' }]}
+        right={<><button className="btn sm" onClick={() => nav(`/c/${conn.id}/db/${encodeURIComponent(db)}/query`)}>SQL</button><button className="btn primary sm" onClick={() => setCreating(true)}>+ Table</button></>} />
       <div className="row wrap" style={{ marginBottom: 10 }}>
-        <input className="grow mono" placeholder="테이블 검색" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg)' }} />
-        <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={showSys} onChange={(e) => setShowSys(e.target.checked)} /> 시스템 테이블</label>
-        <button className="btn ghost icon sm" onClick={load} disabled={loading} title="새로고침" aria-label="새로고침">{loading ? <span className="spin" /> : Icons.refresh}</button>
+        <input className="grow mono" placeholder="Search tables" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg)' }} />
+        <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={showSys} onChange={(e) => setShowSys(e.target.checked)} /> System tables</label>
+        <button className="btn ghost icon sm" onClick={load} disabled={loading} title="Refresh" aria-label="Refresh">{loading ? <span className="spin" /> : Icons.refresh}</button>
         <ResultBadge r={res} />
       </div>
       {res && !res.ok && <div className="card danger">{describeResult(res)}</div>}
-      {res?.ok && shown.length === 0 && <div className="empty">테이블이 없습니다.</div>}
+      {res?.ok && shown.length === 0 && <div className="empty">No tables.</div>}
       <div className="list">
         {shown.map((t) => (
           <div key={t} className="item">
             <div className="grow" style={{ cursor: 'pointer' }} onClick={() => nav(`/c/${conn.id}/db/${encodeURIComponent(db)}/t/${encodeURIComponent(t)}`)}>
               <div className="title mono">{t}</div>
-              {isSystemTable(t) && <div className="sub">시스템 테이블</div>}
+              {isSystemTable(t) && <div className="sub">System table</div>}
             </div>
-            <button className="btn ghost icon sm danger" onClick={() => drop(t)} title="삭제" aria-label="삭제">{Icons.trash}</button>
+            <button className="btn ghost icon sm danger" onClick={() => drop(t)} title="Delete" aria-label="Delete">{Icons.trash}</button>
           </div>
         ))}
       </div>
-      <button className="fab" onClick={() => setCreating(true)} aria-label="테이블 생성">+</button>
+      <button className="fab" onClick={() => setCreating(true)} aria-label="Create table">+</button>
       {creating && conn.kind === 'go' && <CreateSqlTableModal onClose={() => setCreating(false)} onCreate={async (spec) => {
         const r = await createTable(conn, db, spec);
-        if (r.ok) { toast(`"${spec.table_name}" 생성됨`, 'ok'); setCreating(false); load(); } else toast(`생성 실패: ${describeResult(r)}`, 'err');
+        if (r.ok) { toast(`"${spec.table_name}" created`, 'ok'); setCreating(false); load(); } else toast(`Create failed: ${describeResult(r)}`, 'err');
       }} />}
       {creating && conn.kind === 'rest' && <CreateTableModal onClose={() => setCreating(false)} onCreate={async (spec) => {
         const r = await createTable(conn, db, spec);
-        if (r.ok) { toast(`"${spec.table_name}" 생성됨`, 'ok'); setCreating(false); load(); } else toast(`생성 실패: ${describeResult(r)}`, 'err');
+        if (r.ok) { toast(`"${spec.table_name}" created`, 'ok'); setCreating(false); load(); } else toast(`Create failed: ${describeResult(r)}`, 'err');
       }} />}
       {confirmEl}
     </>
@@ -84,31 +84,31 @@ function CreateTableModal({ onClose, onCreate }: { onClose: () => void; onCreate
   const [busy, setBusy] = useState(false);
   const up = (p: Partial<CreateTableSpec>) => setS((x) => ({ ...x, ...p }));
   return (
-    <Modal title="테이블 생성" onClose={onClose}>
-      <Field label="테이블 이름"><input className="mono" autoFocus value={s.table_name} onChange={(e) => up({ table_name: e.target.value })} /></Field>
+    <Modal title="Create table" onClose={onClose}>
+      <Field label="Table name"><input className="mono" autoFocus value={s.table_name} onChange={(e) => up({ table_name: e.target.value })} /></Field>
       <div className="grid2">
-        <Field label="테이블 유형">
+        <Field label="Table type">
           <select value={s.table_type} onChange={(e) => up({ table_type: e.target.value as TableType })}>
-            <option value="WIDE_TABLE">WIDE_TABLE (JSON 문서, 인덱스 가능)</option>
-            <option value="NORMAL_TABLE">NORMAL_TABLE (키/값)</option>
+            <option value="WIDE_TABLE">WIDE_TABLE (JSON documents, indexable)</option>
+            <option value="NORMAL_TABLE">NORMAL_TABLE (key/value)</option>
             <option value="PRIMITIVE_TABLE">PRIMITIVE_TABLE</option>
           </select>
         </Field>
-        <Field label="키 유형">
+        <Field label="Key type">
           <select value={s.key_type} onChange={(e) => up({ key_type: e.target.value as KeyType })}>
-            <option value="NORMAL_KEY">NORMAL_KEY (문자열)</option>
-            <option value="NORMAL_KEY_LONG">NORMAL_KEY_LONG (정수)</option>
+            <option value="NORMAL_KEY">NORMAL_KEY (string)</option>
+            <option value="NORMAL_KEY_LONG">NORMAL_KEY_LONG (integer)</option>
             <option value="COMPOSITE_KEY">COMPOSITE_KEY</option>
           </select>
         </Field>
-        <Field label="키 크기 (바이트)"><input type="number" min={1} value={s.key_sz} onChange={(e) => up({ key_sz: Number(e.target.value) })} /></Field>
-        <Field label="버전 관리"><select value={s.version_type} onChange={(e) => up({ version_type: Number(e.target.value) })}><option value={0}>사용 안 함</option><option value={1}>사용</option></select></Field>
+        <Field label="Key size (bytes)"><input type="number" min={1} value={s.key_sz} onChange={(e) => up({ key_sz: Number(e.target.value) })} /></Field>
+        <Field label="Versioning"><select value={s.version_type} onChange={(e) => up({ version_type: Number(e.target.value) })}><option value={0}>Off</option><option value={1}>On</option></select></Field>
       </div>
-      <label className="check"><input type="checkbox" checked={s.allow_duplicate} onChange={(e) => up({ allow_duplicate: e.target.checked })} /> 중복 키 허용 (allow_duplicate)</label>
-      <label className="check"><input type="checkbox" checked={s.allow_rev_idx} onChange={(e) => up({ allow_rev_idx: e.target.checked })} /> 역 인덱스 (allow_rev_idx, WIDE_TABLE)</label>
+      <label className="check"><input type="checkbox" checked={s.allow_duplicate} onChange={(e) => up({ allow_duplicate: e.target.checked })} /> Allow duplicate keys (allow_duplicate)</label>
+      <label className="check"><input type="checkbox" checked={s.allow_rev_idx} onChange={(e) => up({ allow_rev_idx: e.target.checked })} /> Reverse index (allow_rev_idx, WIDE_TABLE)</label>
       <div className="actions">
-        <button className="btn" onClick={onClose}>취소</button>
-        <button className="btn primary" disabled={busy || !s.table_name.trim()} onClick={async () => { setBusy(true); try { await onCreate({ ...s, table_name: s.table_name.trim() }); } finally { setBusy(false); } }}>생성</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn primary" disabled={busy || !s.table_name.trim()} onClick={async () => { setBusy(true); try { await onCreate({ ...s, table_name: s.table_name.trim() }); } finally { setBusy(false); } }}>Create</button>
       </div>
     </Modal>
   );
@@ -129,25 +129,25 @@ function CreateSqlTableModal({ onClose, onCreate }: { onClose: () => void; onCre
   let preview = '';
   try { preview = name.trim() ? createTableSql({ ...base, columns: cols }) : ''; } catch (e) { preview = `-- ${(e as Error).message}`; }
   return (
-    <Modal title="테이블 생성 (SQL)" onClose={onClose}>
-      <Field label="테이블 이름"><input className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
+    <Modal title="Create table (SQL)" onClose={onClose}>
+      <Field label="Table name"><input className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
       {rawSql === null ? (
         <>
-          <div className="muted small" style={{ marginBottom: 6 }}>컬럼</div>
+          <div className="muted small" style={{ marginBottom: 6 }}>Columns</div>
           {cols.map((c) => (
             <div key={c.id} className="row wrap" style={{ marginBottom: 6, gap: 6 }}>
-              <input className="mono" placeholder="이름" value={c.name} onChange={(e) => upCol(c.id, { name: e.target.value })} style={{ ...inp, flex: '1 1 110px' }} />
+              <input className="mono" placeholder="Name" value={c.name} onChange={(e) => upCol(c.id, { name: e.target.value })} style={{ ...inp, flex: '1 1 110px' }} />
               <select value={c.decl} onChange={(e) => upCol(c.id, { decl: e.target.value })} style={{ ...inp, width: 100 }}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
               <label className="check small" style={{ margin: 0 }}><input type="checkbox" checked={!!c.pk} onChange={(e) => upCol(c.id, { pk: e.target.checked })} />PK</label>
               <label className="check small" style={{ margin: 0 }}><input type="checkbox" checked={!!c.notNull} onChange={(e) => upCol(c.id, { notNull: e.target.checked })} />NOT NULL</label>
               <label className="check small" style={{ margin: 0 }}><input type="checkbox" checked={!!c.unique} onChange={(e) => upCol(c.id, { unique: e.target.checked })} />UNIQUE</label>
               <input className="mono" placeholder="DEFAULT" value={c.default ?? ''} onChange={(e) => upCol(c.id, { default: e.target.value })} style={{ ...inp, width: 90 }} />
-              <button className="btn sm ghost" onClick={() => setCols((l) => l.filter((x) => x.id !== c.id))} aria-label="컬럼 삭제">✕</button>
+              <button className="btn sm ghost" onClick={() => setCols((l) => l.filter((x) => x.id !== c.id))} aria-label="Delete column">✕</button>
             </div>
           ))}
           <div className="row" style={{ marginBottom: 10 }}>
-            <button className="btn sm" onClick={() => setCols((l) => [...l, { id: Date.now(), name: '', decl: 'TEXT' }])}>+ 컬럼</button>
-            <button className="btn sm ghost" onClick={() => setRawSql(preview)}>SQL 직접 편집</button>
+            <button className="btn sm" onClick={() => setCols((l) => [...l, { id: Date.now(), name: '', decl: 'TEXT' }])}>+ Column</button>
+            <button className="btn sm ghost" onClick={() => setRawSql(preview)}>Edit SQL directly</button>
           </div>
           {preview && <pre className="out">{preview}</pre>}
         </>
@@ -155,14 +155,14 @@ function CreateSqlTableModal({ onClose, onCreate }: { onClose: () => void; onCre
         <Field label="CREATE TABLE SQL"><textarea className="mono" rows={8} value={rawSql} spellCheck={false} onChange={(e) => setRawSql(e.target.value)} /></Field>
       )}
       <div className="actions">
-        <button className="btn" onClick={onClose}>취소</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
         <button className="btn primary" disabled={busy || (rawSql === null ? !name.trim() : !rawSql.trim())} onClick={async () => {
           setBusy(true);
           try {
             if (rawSql !== null) await onCreate({ ...base, table_name: name.trim() || 'table', sql: rawSql });
             else { createTableSql({ ...base, columns: cols }); await onCreate({ ...base, columns: cols }); }
           } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); }
-        }}>생성</button>
+        }}>Create</button>
       </div>
     </Modal>
   );

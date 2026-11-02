@@ -14,7 +14,7 @@ describe('parseDocuments', () => {
   it('parses JSON lines and skips blanks', () => {
     expect(parseDocuments('{"_pk":"a"}\n\n{"_pk":"b"}\n')).toEqual([{ _pk: 'a' }, { _pk: 'b' }]);
   });
-  it('reports the failing line', () => expect(() => parseDocuments('{"_pk":"a"}\n{bad')).toThrow(/2번째 줄/));
+  it('reports the failing line', () => expect(() => parseDocuments('{"_pk":"a"}\n{bad')).toThrow(/line 2/));
   it('rejects non-objects', () => expect(() => parseDocuments('[1]')).toThrow());
   it('empty input', () => expect(parseDocuments('  ')).toEqual([]));
 });

@@ -129,6 +129,6 @@ export async function rawRequest(conn: Connection, req: RawRequest): Promise<Api
 }
 
 function failure(url: string, method: HttpMethod, started: number, e: unknown): ApiResult {
-  const msg = e instanceof Error ? (e.name === 'AbortError' ? '요청 시간 초과' : e.message) : String(e);
+  const msg = e instanceof Error ? (e.name === 'AbortError' ? 'Request timed out' : e.message) : String(e);
   return { ok: false, status: 0, data: null, text: '', url, method, durationMs: Date.now() - started, error: msg };
 }

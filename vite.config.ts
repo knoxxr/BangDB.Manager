@@ -35,7 +35,7 @@ export default defineConfig({
       manifest: {
         name: 'BangDB Manager',
         short_name: 'BangDB',
-        description: 'BangDB 데이터베이스/테이블 관리 도구',
+        description: 'BangDB database and table management tool',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
