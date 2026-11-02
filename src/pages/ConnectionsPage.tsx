@@ -9,6 +9,7 @@ import type { AuthMode, Connection, DbParams, EndpointDef, EndpointKey, HttpMeth
 import { TopBar } from '../components/Layout';
 import { Field, Modal, describeResult, useConfirm, useToast } from '../components/ui';
 import { isGatewayKind, newId, normalize, store, useStore } from '../store/store';
+import { isElectron } from '../platform';
 
 export default function ConnectionsPage() {
   const { connections } = useStore();
@@ -128,7 +129,7 @@ function ConnectionForm({ initial, isNew, onClose, onSave }: { initial: Connecti
             return;
           }
           const was = isGatewayKind(c.kind) || !c.baseUrl;
-          up({ kind, db: undefined, baseUrl: was ? (kind === 'go' ? 'http://192.168.0.10:18081' : 'http://192.168.0.10:18080') : c.baseUrl.replace(/:1808[01](\/|$)/, kind === 'go' ? ':18081$1' : ':18080$1') });
+          up({ kind, db: undefined, baseUrl: was ? (kind === 'go' ? 'http://192.168.0.10:18081' : 'http://192.168.0.10:18080') : c.baseUrl.replace(/:1808[01](\/|$)/, kind === 'go' ? ':18081$1' : ':18080$1'), useProxy: kind === 'rest' && isElectron });
           if (kind === 'go') upAuth({ mode: 'basic' });
         }}>
           <optgroup label="BangDB">
@@ -182,7 +183,7 @@ function ConnectionForm({ initial, isNew, onClose, onSave }: { initial: Connecti
           <Field label="응답의 토큰 필드"><input className="mono" value={c.auth.tokenField} onChange={(e) => upAuth({ tokenField: e.target.value })} /></Field>
         </div>
       )}
-      <label className="check"><input type="checkbox" checked={c.useProxy} onChange={(e) => up({ useProxy: e.target.checked })} /> 프록시 경유 (앱과 같은 호스트의 /bangdb 로 요청, CORS 회피)</label>
+      <label className="check"><input type="checkbox" checked={c.useProxy} onChange={(e) => up({ useProxy: e.target.checked })} /> 프록시 경유 (앱과 같은 호스트의 /bangdb 로 요청, CORS 회피{isElectron ? ' · 데스크톱 앱에 내장됨' : ''})</label>
       </>}
 
       {!gateway && <details className="adv">

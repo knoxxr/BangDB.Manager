@@ -5,7 +5,8 @@ BangDB 와 주요 데이터베이스(PostgreSQL, MySQL/MariaDB, SQL Server, SQLi
 
 | 환경 | 방법 |
 |------|------|
-| 데스크톱 브라우저 (Windows/macOS/Linux) | 빌드된 웹앱을 열기 |
+| Windows / Linux / macOS 데스크톱 앱 | 릴리즈의 설치 파일 (Electron, 프록시·DB 게이트웨이 내장, 휴대폰용 LAN 서버 기능) |
+| 데스크톱 브라우저 | 빌드된 웹앱을 열기 |
 | 스마트폰 브라우저 → 홈 화면 설치 (PWA) | Android Chrome "홈 화면에 추가", iOS Safari "홈 화면에 추가" |
 | Android / iOS 네이티브 앱 | Capacitor 로 래핑 (`npm run cap:android` / `npm run cap:ios`) |
 | 서버 배포 | `Dockerfile` (정적 파일 + CORS 프록시 + DB 게이트웨이) |
@@ -48,6 +49,23 @@ BangDB 가 없을 때는 모의 서버로 UI를 확인할 수 있습니다.
 ```bash
 node scripts/mock-bangdb.mjs          # 18080 포트에 모의 BangDB
 ```
+
+## 데스크톱 앱 (Windows / Linux / macOS)
+
+릴리즈 페이지의 설치 파일을 내려받습니다.
+
+| OS | 파일 | 설치 |
+|---|---|---|
+| Windows 10/11 (x64) | `bangdb-manager-<버전>-windows-x64-setup.exe` | 실행 → 설치 위치 선택. 서명이 없어 SmartScreen 경고가 뜨면 "추가 정보 → 실행" |
+| Linux (x64) | `bangdb-manager-<버전>-linux-x86_64.AppImage` | `chmod +x` 후 실행 (설치 불필요) |
+| Debian/Ubuntu | `bangdb-manager-<버전>-linux-amd64.deb` | `sudo apt install ./bangdb-manager-*.deb` |
+| macOS (Apple Silicon) | `bangdb-manager-<버전>-macos-arm64.dmg` | 서명이 없어 처음엔 우클릭 → 열기 |
+
+데스크톱 앱에는 프록시와 DB 게이트웨이가 내장되어 있습니다. BangDB 2.0 REST 서버는 "프록시 경유"(데스크톱에서 만든 REST 연결은 기본으로 켜짐)로, PostgreSQL·MySQL·SQL Server·SQLite·MongoDB·Redis 는 게이트웨이 주소를 비워 둔 채로 바로 연결됩니다. 게이트웨이 토큰은 앱이 실행마다 만들어 자기 창에 자동으로 넣습니다(`GATEWAY_TOKEN` 환경 변수로 고정 가능). SQLite 파일 폴더는 문서 폴더의 `BangDB Manager`(`SQLITE_ROOT` 로 변경).
+
+메뉴 **서버 → 휴대폰 접속 허용** 을 켜면 앱이 `http://<PC IP>:8080` 에서 같은 UI 를 제공하므로, 같은 Wi-Fi 의 휴대폰은 아무것도 설치하지 않고 브라우저로 접속해 "홈 화면에 추가"하면 됩니다(방화벽에서 8080 허용 필요, 포트는 `BANGDB_MANAGER_LAN_PORT`). 휴대폰에서 게이트웨이 DB 를 쓰려면 **서버 → 휴대폰 접속 주소·토큰 보기** 의 토큰을 연결 편집의 게이트웨이 토큰에 넣습니다.
+
+소스에서 만들려면: `npm run build && npm ci --omit=dev --prefix proxy && npm run desktop:linux` (또는 `desktop:win`, `desktop:mac`, 각 OS 에서 실행). 결과는 `release/` 에 생깁니다. 개발 중 실행은 `npm run build && npm run electron`.
 
 ## 배포 (웹/PWA)
 
@@ -136,7 +154,7 @@ BangDB 서버는 보통 `bangdb.config` 의 `BANGDB_DATABASE_NAME` 하나를 서
 
 ## 릴리즈
 
-`v*` 태그를 푸시하면 `.github/workflows/release.yml` 이 웹 빌드 zip 과 Android 디버그 APK 를 만들어 GitHub Release 에 첨부합니다.
+`v*` 태그를 푸시하면 `.github/workflows/release.yml` 이 웹 빌드 zip, Android 디버그 APK, Windows 설치 파일, Linux AppImage/deb, macOS dmg 를 만들어 GitHub Release 에 첨부합니다.
 
 ```bash
 git tag v0.2.0 && git push origin v0.2.0
@@ -157,7 +175,8 @@ src/api/        endpoints.ts(템플릿) · http.ts(fetch/CapacitorHttp 래퍼) �
 src/store/      연결 목록·요청 기록 (localStorage)
 src/pages/      서버 / DB / 테이블 / 테이블 상세 / SQL / REST 콘솔 / 정보, MongoDB·Redis 화면
 src/components/ 레이아웃(하단 탭·사이드바), 모달, 토스트, 데이터 그리드, 행 폼, 스키마 폼
-proxy/          정적 파일 + CORS 프록시 서버, gateway/ (PostgreSQL·MySQL·SQL Server·SQLite·MongoDB·Redis 어댑터)
+proxy/          정적 파일 + CORS 프록시 + DB 게이트웨이 (lib.mjs 는 데스크톱 앱과 공유)
+electron/       데스크톱 셸 (내장 프록시·게이트웨이, 휴대폰 접속용 LAN 서버 메뉴)
 scripts/        모의 BangDB 서버
 capacitor.config.ts  네이티브 앱 설정
 ```

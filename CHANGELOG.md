@@ -1,4 +1,12 @@
-## 미출시 — 주요 데이터베이스 지원 (DB 게이트웨이)
+## v0.3.0 — Windows / Linux / macOS 데스크톱 앱, 주요 데이터베이스 지원
+
+**데스크톱 앱 (Electron)**
+- 설치 파일: Windows `…-windows-x64-setup.exe`(NSIS), Linux `…-linux-x86_64.AppImage` / `…-linux-amd64.deb`, macOS `…-macos-arm64.dmg`. 서명은 없습니다(SmartScreen/Gatekeeper 경고 시 수동 허용).
+- 프록시와 DB 게이트웨이(PostgreSQL·MySQL·SQL Server·SQLite·MongoDB·Redis 드라이버 포함)를 내장. REST 서버는 CORS 없이 연결되고(데스크톱에서 만든 REST 연결은 "프록시 경유" 기본), 게이트웨이 DB 는 주소를 비워 둔 채 바로 연결. 토큰은 실행마다 자동 생성되어 앱 창에 주입.
+- 메뉴 **서버 → 휴대폰 접속 허용**: 앱이 `http://<PC IP>:8080` 에서 같은 UI 를 제공해 같은 네트워크의 휴대폰이 설치 없이 브라우저로 사용(홈 화면에 추가 가능). 주소·토큰 보기/복사 메뉴.
+- 프록시 서버 코드를 `proxy/lib.mjs` 로 분리해 CLI(`npm run proxy`)와 데스크톱 앱이 공유.
+
+**주요 데이터베이스 지원 (DB 게이트웨이)**
 
 PostgreSQL, MySQL/MariaDB, SQL Server, SQLite, MongoDB, Redis 에 접속해 관리할 수 있습니다. 브라우저·휴대폰은 이 DB 들에 직접 접속할 수 없어서, 앱을 서비스하는 서버(`npm run dev`, `proxy/server.mjs`, Docker)에 **DB 게이트웨이**(`/gw/*`)를 넣었습니다.
 

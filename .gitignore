@@ -7,3 +7,6 @@ ios
 *.log
 .playwright-mcp
 data/
+release/
+build/*
+!build/icon.png
